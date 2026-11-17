@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entrenador Pistola 10 m</title>
+<meta name="description" content="Plan de entrenamiento de pistola de aire 10 m con timers, semáforo de disparo y registro en Excel.">
+<meta name="theme-color" content="#14263b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Pistola 10 m">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* Layout idea: one-screen phone app. Scrolling content, fixed bottom tab bar, one large timer dial as the hero of the Timers tab, shot pad always within thumb reach. */
+:root{
+  --bg:#f3f5f7; --surface:#ffffff; --ink:#14263b; --mute:#5b6978; --line:#d5dce4;
+  --accent:#d9541e; --accent-ink:#ffffff; --soft:#e8edf2;
+  --ok:#2e8b57; --warn:#c99a00; --bad:#c8372d;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif; --body:"Barlow",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1822; --surface:#182432; --ink:#e9eef4; --mute:#9aa8b7; --line:#2b3a4b; --accent:#f07a45; --accent-ink:#14110f; --soft:#213041;
+  --ok:#4fb47e; --warn:#e0b83a; --bad:#ea6a5f; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0f1822; --surface:#182432; --ink:#e9eef4; --mute:#9aa8b7; --line:#2b3a4b; --accent:#f07a45; --accent-ink:#14110f; --soft:#213041;
+  --ok:#4fb47e; --warn:#e0b83a; --bad:#ea6a5f; color-scheme:dark;}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.4;display:flex;flex-direction:column}
+main{flex:1;overflow-y:auto;padding:16px 16px 24px;max-width:640px;width:100%;margin:0 auto}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:.01em}
+h1{font-size:30px;line-height:1.05}
+h2{font-size:22px;margin-top:20px;margin-bottom:8px}
+h3{font-size:19px;line-height:1.15}
+p{margin:0}
+.mute{color:var(--mute);font-size:14px}
+.view{display:none;flex-direction:column;gap:12px}
+.view.on{display:flex}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.between{justify-content:space-between}
+.pill{font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px;background:var(--soft);color:var(--ink);white-space:nowrap}
+.pill.acc{background:var(--accent);color:var(--accent-ink)}
+button{font:inherit;color:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:var(--surface);padding:10px 14px;font-weight:600;min-height:44px}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.sm{min-height:36px;padding:6px 10px;font-size:14px}
+button.ghost{background:transparent}
+.days{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.days button{padding:8px 2px;font-size:14px;display:flex;flex-direction:column;align-items:center;gap:2px}
+.days button.sel{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.days small{font-weight:500;color:var(--mute);font-size:11px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--line)}
+.dot.full{background:var(--ok)}
+.item{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.item:first-of-type{border-top:0}
+.item input[type=checkbox]{width:24px;height:24px;margin:1px 0 0;accent-color:var(--accent);flex:none}
+.item .tx{flex:1}
+.item.done .tx{color:var(--mute);text-decoration:line-through}
+.bar{height:8px;border-radius:99px;background:var(--soft);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ok)}
+/* timer */
+.dial{align-self:center;width:min(66vw,270px);aspect-ratio:1;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:18px;text-align:center;
+  border:10px solid var(--soft);background:var(--surface);transition:border-color .2s,transform 4s linear}
+.dial.prep{border-color:var(--warn)} .dial.hold{border-color:var(--ok)} .dial.rest{border-color:var(--line)} .dial.abort{border-color:var(--bad)}
+.dial .ph{font-family:var(--display);font-size:26px;text-transform:uppercase;line-height:1.05}
+.dial .num{font-family:var(--display);font-size:78px;line-height:.95;font-variant-numeric:tabular-nums}
+.dial .sub{color:var(--mute);font-size:14px;font-variant-numeric:tabular-nums}
+.stepHead{text-align:center;display:flex;flex-direction:column;gap:3px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.grid6{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--mute);font-weight:600}
+input[type=number],input[type=date],select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px;width:100%;min-height:42px}
+textarea{min-height:70px;resize:vertical}
+.presets{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.presets button{text-align:left;display:flex;flex-direction:column;gap:2px;align-items:flex-start}
+.presets small{font-weight:400;color:var(--mute);font-size:12px}
+.legend{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:14px}
+.legend b{font-family:var(--display);font-size:16px}
+.big{font-family:var(--display);font-size:32px;font-variant-numeric:tabular-nums;line-height:1}
+/* shot pad */
+.pad{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.pad .cols{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.pad .cols button{min-height:62px;font-size:17px;color:#fff;border:0;padding:6px 2px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
+.pad .cols button b{font-family:var(--display);font-size:22px;line-height:1}
+.pad .cols button span{font-size:12px;font-weight:600;opacity:.9}
+.c-v{background:var(--ok)} .c-a{background:var(--warn);color:#201a00!important} .c-r{background:var(--bad)} .c-x{background:var(--mute)}
+.pad .an{display:grid;grid-template-columns:auto 1fr 1fr auto;gap:6px;align-items:center}
+.pad .an button{min-height:46px;padding:6px 8px;white-space:nowrap}
+.pad .an .hot{border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent)}
+.pad .st{font-size:13px;color:var(--mute);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.pad .st b{color:var(--ink)}
+table.ev{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+table.ev th{text-align:left;font-size:12px;color:var(--mute);font-weight:600;padding:4px 4px;border-bottom:1px solid var(--line)}
+table.ev td{padding:6px 4px;border-bottom:1px solid var(--line)}
+table.ev td.n{text-align:right}
+.up{color:var(--ok);font-weight:600} .dn{color:var(--bad);font-weight:600}
+ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:8px}
+ul.plain{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px}
+nav{display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-top:1px solid var(--line)}
+nav button{border:0;border-radius:0;background:transparent;padding:10px 2px 12px;font-size:13px;color:var(--mute);border-top:3px solid transparent;min-height:52px}
+nav button.on{color:var(--ink);border-top-color:var(--accent)}
+.note{border-left:4px solid var(--accent);background:var(--soft);padding:10px 12px;border-radius:0 10px 10px 0;font-size:14px}
+.hist{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.hist:first-child{border-top:0}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (prefers-reduced-motion:reduce){.dial{transition:none}}
+</style>
+</head>
+<body>
+<main id="main">
+
+<!-- ===================== HOY ===================== -->
+<section class="view on" id="v-hoy">
+  <div class="row between">
+    <div><h1 id="hoyTitle">Hoy</h1><p class="mute" id="hoySub"></p></div>
+    <span class="pill acc" id="countdown"></span>
+  </div>
+  <div class="card">
+    <div class="row between">
+      <button class="sm" id="wkPrev" aria-label="Semana anterior">‹</button>
+      <div style="text-align:center"><h3 id="wkTitle"></h3><p class="mute" id="wkPhase"></p></div>
+      <button class="sm" id="wkNext" aria-label="Semana siguiente">›</button>
+    </div>
+    <div class="bar" aria-hidden="true"><i id="wkBar" style="width:0%"></i></div>
+    <div class="days" id="days"></div>
+  </div>
+  <div class="card" id="sessCard"></div>
+  <div class="card">
+    <h3>Antes y después</h3>
+    <div class="row">
+      <button class="sm" data-preset="seq" data-o='{"id":"calShort"}'>Calentamiento 10 min</button>
+      <button class="sm" data-preset="seq" data-o='{"id":"movShort"}'>Movilidad por zonas</button>
+      <button class="sm" data-preset="breath">Respiración 4–6</button>
+      <button class="sm" data-go="rutina">Rutina de disparo</button>
+    </div>
+    <button class="pri" id="toSession">Registrar esta sesión</button>
+  </div>
+</section>
+
+<!-- ===================== TIMERS ===================== -->
+<section class="view" id="v-timers">
+  <div><h1>Temporizadores</h1><p class="mute" id="tName">Elige un ejercicio</p></div>
+
+  <!-- interval (shooting) -->
+  <div id="intervalPanel" style="display:flex;flex-direction:column;gap:12px">
+    <div class="dial" id="dial">
+      <div class="ph" id="dPh">Listo</div>
+      <div class="num" id="dNum">0</div>
+      <div class="sub" id="dSub">—</div>
+    </div>
+    <div class="row" style="justify-content:center">
+      <button class="pri" id="tStart">Empezar</button>
+      <button id="tPause" disabled>Pausa</button>
+      <button id="tStop" disabled>Parar</button>
+    </div>
+  </div>
+
+  <!-- sequence (warm-ups, mobility, physical) -->
+  <div id="seqPanel" style="display:none;flex-direction:column;gap:12px">
+    <div class="stepHead"><h3 id="sName">—</h3><p class="mute" id="sCue"></p></div>
+    <div class="dial" id="sDial">
+      <div class="ph" id="sPh">Listo</div>
+      <div class="num" id="sNum">0</div>
+      <div class="sub" id="sSub">—</div>
+    </div>
+    <p class="mute" style="text-align:center" id="sNext"></p>
+    <div class="bar" aria-hidden="true"><i id="sBar" style="width:0%"></i></div>
+    <div class="row" style="justify-content:center">
+      <button class="pri" id="sStart">Empezar</button>
+      <button id="sPause" disabled>Pausa</button>
+      <button id="sSkip" disabled>Saltar paso</button>
+      <button id="sStop" disabled>Parar</button>
+    </div>
+  </div>
+
+  <!-- match clock -->
+  <div id="matchPanel" style="display:none;flex-direction:column;gap:12px">
+    <div class="dial" id="mDial">
+      <div class="ph" id="mPh">Listo</div>
+      <div class="num" id="mNum" style="font-size:66px">15:00</div>
+      <div class="sub" id="mSub">—</div>
+    </div>
+    <div class="row" style="justify-content:center">
+      <button class="pri" id="mStart">Empezar</button>
+      <button id="mNext" disabled>Pasar a tirada</button>
+      <button id="mStop" disabled>Parar</button>
+    </div>
+    <div class="row between"><div class="big" id="mShots">0 / 60</div><p class="mute" id="mPace" style="text-align:right">Cada color que marques cuenta un disparo</p></div>
+  </div>
+
+  <!-- breathing -->
+  <div id="breathPanel" style="display:none;flex-direction:column;gap:12px">
+    <div class="dial" id="bDial"><div class="ph" id="bPh">Listo</div><div class="num" id="bNum">3:00</div><div class="sub">4 s dentro · 6 s fuera</div></div>
+    <div class="row" style="justify-content:center"><button class="pri" id="bStart">Empezar</button><button id="bStop" disabled>Parar</button></div>
+  </div>
+
+  <div class="pad" id="padT" data-pad></div>
+
+  <div class="card" id="cfgCard">
+    <div class="grid4">
+      <label class="f" for="cReps">Repeticiones<input type="number" id="cReps" min="1" max="99" inputmode="numeric"></label>
+      <label class="f" for="cPrep">Subida (s)<input type="number" id="cPrep" min="0" max="60" inputmode="numeric"></label>
+      <label class="f" for="cHold" id="cHoldL">Trabajo (s)<input type="number" id="cHold" min="1" max="600" inputmode="numeric"></label>
+      <label class="f" for="cRest">Descanso (s)<input type="number" id="cRest" min="0" max="600" inputmode="numeric"></label>
+    </div>
+    <div class="legend" id="legend"></div>
+  </div>
+  <div class="card" id="seqLegend" style="display:none"><div class="legend">
+    <b>1 pitido</b><span>Empieza el ejercicio o el paso</span>
+    <b>2 pitidos</b><span>Para: descanso o cambio de lado</span>
+    <b>3 clics</b><span>Quedan 3 segundos</span>
+    <b>3 pitidos</b><span>Fin de la secuencia</span>
+  </div></div>
+
+  <h2>Tiro y parada</h2>
+  <div class="presets" id="pTiro"></div>
+  <h2>Competición y controles</h2>
+  <div class="presets" id="pMatch"></div>
+  <h2>Calentamiento y movilidad</h2>
+  <div class="presets" id="pCal"></div>
+  <h2>Físico</h2>
+  <div class="presets" id="pFis"></div>
+  <p class="mute">Cada ejercicio suelto tiene su timer en la pestaña Guía.</p>
+  <div class="row"><label class="row" for="optVib" style="font-size:14px"><input type="checkbox" id="optVib" checked> Vibrar además de sonar</label>
+  <button class="sm" id="testSnd">Probar sonido</button></div>
+  <p class="mute">Sube el volumen multimedia y deja la pantalla encendida: con el móvil bloqueado los avisos pueden retrasarse.</p>
+</section>
+
+<!-- ===================== GUÍA ===================== -->
+<section class="view" id="v-guia">
+  <div><h1>Guía de ejercicios</h1><p class="mute">Cómo se hace cada ejercicio y su dosis base. Cada uno abre su timer.</p></div>
+  <div id="guia"></div>
+</section>
+
+<!-- ===================== RUTINA ===================== -->
+<section class="view" id="v-rutina">
+  <div><h1>Rutina de disparo</h1><p class="mute">Tu rutina del 12 de noviembre. Marca el color abajo tras cada disparo.</p></div>
+  <div class="card"><ol class="steps">
+    <li><b>Posición.</b> Pies, empuñadura y punto natural. En el primer disparo, cada 5 disparos o cada vez que me mueva.</li>
+    <li><b>Carga y primera respiración.</b> Cargo y respiro profundo, moviendo los dedos de los pies y situándome en la galería.</li>
+    <li><b>Segunda respiración.</b> Coloco el cuerpo, relajo la musculatura y noto el latido.</li>
+    <li><b>Visualización.</b> Enfilo el blanco, adopto la posición y visualizo el tiro.</li>
+    <li><b>Subida y bajada.</b> Subo contando 3 y tomo aire. Bajo soltando aire, contando otros 3, y aprieto el primer tiempo al entrar en zona.</li>
+    <li><b>Puntería y disparo.</b> Dejo de contar. Punto de mira nítido, diana borrosa, presión continua. Sale dentro de 8 s o bajo.</li>
+    <li><b>Seguimiento.</b> Miras y dedo en el disparador 2 s tras el disparo.</li>
+    <li><b>Anuncio y color.</b> Valor, hora y color antes de mirar el impacto.</li>
+    <li><b>Recuperación.</b> Suelto el brazo y empiezo la respiración del siguiente.</li>
+  </ol></div>
+  <div class="pad" id="padR" data-pad></div>
+  <div class="card"><h3>Reglas</h3><ul class="plain">
+    <li>Tras un aborto se reinicia desde el paso 3.</li>
+    <li>Ciclo completo de 50–55 s como máximo; en competición hay 75 s de media por disparo.</li>
+    <li>Los 8 s no se cuentan: se notan, y el SCATT los confirma.</li>
+    <li>Tras dos disparos malos seguidos: dejar la pistola, sentarse 1 min, respirar, tres sueltas en seco y volver.</li>
+  </ul></div>
+  <div class="card"><h3>Semáforo</h3><div class="legend">
+    <b style="color:var(--ok)">Verde</b><span>Rutina completa, buena parada, disparo sin dudas dentro de los 8 s.</span>
+    <b style="color:var(--warn)">Amarillo</b><span>Algo dudoso sin llegar a forzar: parada regular, dedo que para y sigue, tiempo apurado.</span>
+    <b style="color:var(--bad)">Rojo</b><span>Sabías que tenías que bajar y disparaste: más de 8 s, tirón, cazar el diez, prisa o enfado.</span>
+  </div><p class="mute">Se decide antes de mirar el impacto. Entre dos colores, el peor. El anuncio se marca después: acertado si fallas por una zona o menos.</p></div>
+</section>
+
+<!-- ===================== SESIÓN ===================== -->
+<section class="view" id="v-sesion">
+  <div><h1>Registro de la sesión</h1><p class="mute">El semáforo se rellena solo con lo que marques en los timers o en la rutina.</p></div>
+  <div class="pad" id="padS" data-pad></div>
+
+  <div class="card">
+    <h3>Datos de la sesión</h3>
+    <div class="grid3">
+      <label class="f" for="fFecha">Fecha<input type="date" id="fFecha"></label>
+      <label class="f" for="fLugar">Lugar<select id="fLugar"><option>SCATT</option><option>Galería</option><option>Casa en seco</option><option>Competición</option></select></label>
+      <label class="f" for="fDur">Duración (min)<input type="number" id="fDur" inputmode="numeric"></label>
+    </div>
+    <div class="grid3">
+      <label class="f" for="fSes" style="grid-column:span 2">Tipo de sesión<select id="fSes"></select></label>
+      <label class="f" for="fFis">Físico<select id="fFis"><option>No</option><option>A</option><option>B</option><option>Movilidad</option></select></label>
+    </div>
+    <div class="grid3">
+      <label class="f" for="fLev">Levantadas en seco<input type="number" id="fLev" inputmode="numeric"></label>
+      <label class="f" for="fDisp">Disparos<input type="number" id="fDisp" inputmode="numeric" placeholder="del semáforo"></label>
+      <label class="f" for="fSen">Sensación (1–5)<select id="fSen"><option value="">–</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+    </div>
+    <h3 style="margin-top:6px">SCATT · medias de la sesión</h3>
+    <div class="grid3">
+      <label class="f" for="f10a0">10a0 (%)<input type="number" id="f10a0" step="0.1" inputmode="decimal"></label>
+      <label class="f" for="f100">10.0 (%)<input type="number" id="f100" step="0.1" inputmode="decimal"></label>
+      <label class="f" for="fT">T. puntería (s)<input type="number" id="fT" step="0.1" inputmode="decimal"></label>
+      <label class="f" for="fL">L (mm)<input type="number" id="fL" step="0.1" inputmode="decimal"></label>
+      <label class="f" for="fDA">DA (mm)<input type="number" id="fDA" step="0.1" inputmode="decimal"></label>
+    </div>
+    <h3 style="margin-top:6px">Puntos por serie de 10</h3>
+    <div class="grid6">
+      <label class="f" for="fS1">S1<input type="number" id="fS1" step="0.1" inputmode="decimal"></label>
+      <label class="f" for="fS2">S2<input type="number" id="fS2" step="0.1" inputmode="decimal"></label>
+      <label class="f" for="fS3">S3<input type="number" id="fS3" step="0.1" inputmode="decimal"></label>
+      <label class="f" for="fS4">S4<input type="number" id="fS4" step="0.1" inputmode="decimal"></label>
+      <label class="f" for="fS5">S5<input type="number" id="fS5" step="0.1" inputmode="decimal"></label>
+      <label class="f" for="fS6">S6<input type="number" id="fS6" step="0.1" inputmode="decimal"></label>
+    </div>
+    <p class="mute" id="fSerTot">Opcional. Si las rellenas, el total y los disparos puntuados se calculan solos.</p>
+    <h3 style="margin-top:6px">Semáforo y anuncio</h3>
+    <div class="grid3">
+      <label class="f" for="fV">Verdes<input type="number" id="fV" inputmode="numeric"></label>
+      <label class="f" for="fA">Amarillos<input type="number" id="fA" inputmode="numeric"></label>
+      <label class="f" for="fR">Rojos<input type="number" id="fR" inputmode="numeric"></label>
+      <label class="f" for="fX">Abortos<input type="number" id="fX" inputmode="numeric"></label>
+      <label class="f" for="fAnn">Anunciados<input type="number" id="fAnn" inputmode="numeric"></label>
+      <label class="f" for="fOk">Acertados<input type="number" id="fOk" inputmode="numeric"></label>
+    </div>
+    <label class="f" for="fNotas">Notas: qué funcionó y qué cambiar<textarea id="fNotas"></textarea></label>
+    <button class="pri" id="saveSess">Guardar sesión</button>
+    <p class="mute" id="saveMsg"></p>
+  </div>
+
+  <div class="card">
+    <div class="row between"><h3>Excel en el móvil</h3><span class="pill" id="nSess">0 sesiones</span></div>
+    <p class="mute">El Excel lleva todas las sesiones guardadas, con una hoja semanal y un resumen que se calculan solos. Se descarga como <b>PracticaTiro_Pistola10m.xlsx</b>. Si el móvil pregunta dónde, elige <b>Documentos/PracticaTiro</b>; si va a Descargas, muévelo allí con la app Archivos y sustituye el anterior.</p>
+    <div class="grid2">
+      <button class="pri" id="xlsSave">Guardar Excel</button>
+      <button id="xlsOpenBtn">Abrir Excel guardado</button>
+    </div>
+    <input type="file" id="xlsOpen" class="sr" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+    <button class="sm ghost" id="xlsCopy">Copiar las sesiones para pegar en Excel</button>
+    <p class="mute" id="xlsMsg"></p>
+  </div>
+
+  <div class="card">
+    <h3>Evolución</h3>
+    <div style="overflow-x:auto"><table class="ev" id="evTable"></table></div>
+    <p class="mute">Primera y última sesión con dato, y la media de las tres últimas.</p>
+  </div>
+
+  <div class="card">
+    <h3>Sesiones guardadas</h3>
+    <div id="histList"></div>
+  </div>
+</section>
+</main>
+
+<nav id="nav">
+  <button data-tab="hoy" class="on">Hoy</button><button data-tab="timers">Timers</button><button data-tab="guia">Guía</button>
+  <button data-tab="rutina">Rutina</button><button data-tab="sesion">Sesión</button>
+</nav>
+
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+/* ---------------- storage (this phone) ---------------- */
+let store={done:{},log:[],acts:[],sessions:[],draft:{},tab:"hoy"};
+try{const s=JSON.parse(localStorage.getItem("tiro10m")||"null");if(s)store=Object.assign(store,s);}catch(e){}
+store.log=(store.log||[]).map(e=>typeof e==="string"?(/^[vaxr]$/.test(e)?{c:e,an:null}:null):e).filter(Boolean);
+store.acts=store.acts||[];store.sessions=store.sessions||[];store.draft=store.draft||{};
+const save=()=>{try{localStorage.setItem("tiro10m",JSON.stringify(store));}catch(e){}};
+
+/* ---------------- programme ---------------- */
+const FA="Físico A",FB="Físico B";
+const PH={0:"Test inicial",1:"Base técnica",2:"Desarrollo",3:"Precompetición",4:"Afinado"};
+const W={
+0:[null,null,["Galería","Test real","10 min de ensayo + 40 disparos puntuados con anuncio. Anotar puntos por serie"],
+   ["SCATT","Test SCATT","20 levantadas con disparo: anotar 10a0, L, DA y tiempo de puntería · Escribir la rutina de disparo"],
+   ["SCATT","Aprender físico","Bloques A y B completos con poca carga · Pared blanca ×20 · Suelta en pared blanca ×20"]],
+1:[["Galería","Tiro: suelta","Si no hiciste el test real, hazlo hoy: 10 min de ensayo + 40 disparos puntuados · Si ya lo hiciste: Blanco vuelto 30 disparos · Ojos cerrados 10 disparos"],
+   ["SCATT","Parada + "+FA,"Punto natural ×5 · Pared blanca ×25 · Parada larga 8 × 20 s"],
+   ["Galería","Tiro: series cortas","6 series de 5 disparos con regla de los 8 s · Seguimiento de 2 s tras cada disparo"],
+   ["SCATT","Suelta + "+FB,"Suelta en pared blanca ×30 · Ojos cerrados ×10 · Disparador puro ×20"],
+   ["SCATT","Repaso","Pared blanca ×20 · Suelta en pared blanca ×20 · Repasar la rutina de disparo"]],
+2:[["Galería","Tiro: suelta","Blanco vuelto 20 disparos · Ojos cerrados 10 disparos · 10 disparos a diana con regla de los 8 s"],
+   ["SCATT","Parada + "+FA,"Punto natural ×5 · Pared blanca ×25 · Parada larga 8 × 25 s · Sobrecarga 6 × 15 s"],
+   ["Galería","CONTROL REAL","10 min de ensayo + 40 disparos en 50 min. Anotar puntos por serie"],
+   ["SCATT","Suelta + "+FB,"Suelta en pared blanca ×30 · Disparador puro ×20 · Zona de puntería ×10"],
+   ["SCATT","Punto flojo","Revisar trazas del control · 30 min del ejercicio que trabaje el peor parámetro"]],
+3:[["Galería","Tiro: suelta","Blanco vuelto 20 disparos · 20 disparos a diana con regla de los 8 s y seguimiento"],
+   ["SCATT","Parada + "+FA,"Punto natural ×5 · Pared blanca ×20 · Parada larga 10 × 30 s · Sobrecarga 8 × 15 s · Línea 5 + 5"],
+   ["Galería","Tiro: series cortas","8 series de 5 disparos · Regla de los 8 s · Anotar abortos por serie"],
+   ["SCATT","Suelta + "+FB,"Suelta en pared blanca ×30 · Zona de puntería ×15 · Ojos cerrados ×10"],
+   ["SCATT","Punto flojo","30–40 min del ejercicio que trabaje el peor parámetro de la semana"]],
+4:[["Galería","Tiro: suelta","Blanco vuelto 15 disparos · 15 disparos a diana con regla de los 8 s"],
+   ["SCATT","Parada + "+FA,"Punto natural ×5 · Pared blanca ×20 · Parada larga 6 × 30 s"],
+   ["Galería","CONTROL REAL","10 min de ensayo + 40 disparos en 50 min. Comparar con semana 2"],
+   ["SCATT","Suelta + "+FB,"Suelta en pared blanca ×20 · Zona de puntería ×10"],
+   ["SCATT","Test SCATT","20 levantadas con disparo. Comparar 10a0, L, DA y tiempo con el test inicial"]],
+5:[["Galería","Tiro: intuición","3 + 1 (tres secos y un real) ×10 ciclos · Ventana de tiempo 20 disparos · Anuncio en todos"],
+   ["SCATT","Parada + "+FA,"Punto natural ×5 · Pared blanca ×20 · Zona de puntería ×20 · Parada larga 6 × 40 s"],
+   ["Galería","Tiro: series de 10","4 series de 10 cronometradas (12 min por serie) · Semáforo y anuncio en cada disparo"],
+   ["SCATT","Decisión + "+FB,"Abortos obligados con dado, 3 series de 10 · Regla de los 8 s"],
+   ["SCATT","Solo dieces","Solo dieces: máx. 20 disparos en 40 min. Contar abortos"]],
+6:[["Galería","Tiro: intuición","Presión continua 2 × 10 · 3 + 1 ×8 ciclos · 10 disparos con anuncio"],
+   ["SCATT","Parada + "+FA,"Pared blanca ×20 · Zona de puntería ×20 · Equilibrio ×8"],
+   ["Galería","CONTROL REAL","10 min de ensayo + 40 disparos en 50 min, con semáforo y anuncio"],
+   ["SCATT","Decisión + "+FB,"Señal externa ×20 levantadas · Suelta en pared blanca ×20"],
+   ["SCATT","Punto flojo","Revisar trazas del control · 30 min del ejercicio que trabaje el peor parámetro"]],
+7:[["Galería","Tiro: intuición","Ventana de tiempo 20 disparos · Presión continua 2 × 10 · Anuncio en todos"],
+   ["SCATT","Parada + "+FA,"Pared blanca ×20 · Zona de puntería ×20 · Sobrecarga 8 × 15 s"],
+   ["Galería","Tiro: decisión","Abortos obligados con dado, 3 series de 10 · 1 serie de 10 normal con semáforo"],
+   ["SCATT","Decisión + "+FB,"Solo dieces: máx. 20 disparos en 35 min · Reinicio tras fallo en cada 8 o peor"],
+   ["SCATT","Series a ritmo","40 disparos en SCATT, 4 series de 10 en 50 min, con semáforo"]],
+8:[["Galería","Tiro: intuición","3 + 1 ×6 ciclos · 20 disparos con anuncio y semáforo"],
+   ["SCATT","Parada + "+FA,"Pared blanca ×15 · Zona de puntería ×15"],
+   ["Galería","CONTROL REAL","10 min de ensayo + 40 disparos en 50 min. Comparar con semanas 2, 4 y 6"],
+   ["SCATT","Decisión + "+FB,"30 disparos en SCATT con semáforo · Fijar la rutina de disparo definitiva"],
+   ["SCATT","Test SCATT","20 levantadas con disparo. Comparar con semana 4 · Visualización 10 min"]],
+9:[["Galería","Tiro: presión","Diez seguidos de 9 o más (límite 30 min) · Disparo único ×10 con 2 min de espera"],
+   ["SCATT","Parada + "+FA+" (2 series)","Pared blanca ×20 · Zona de puntería ×15"],
+   ["Galería","SIMULACRO REAL","Medio simulacro: 10 min de ensayo + 30 disparos en 38 min. Completo (15 + 75 min) si puedes alargar"],
+   ["SCATT","Rutina + "+FB+" (2 series)","30 disparos en SCATT con rutina completa · Ensayar plan de crisis · Visualización 10 min"],
+   ["SCATT","SIMULACRO SCATT","Calentamiento de competición · Simulacro completo: 15 min de preparación y ensayo + 60 disparos en 75 min"]],
+10:[["Galería","Tiro: presión","Disparo único ×10 · 30 disparos con semáforo. Objetivo: cero rojos"],
+   ["SCATT","Parada + "+FA+" (2 series)","Pared blanca ×20 · Zona de puntería ×15"],
+   ["Galería","SIMULACRO REAL","Medio simulacro: 10 min de ensayo + 30 disparos en 38 min. Completo (15 + 75 min) si puedes alargar"],
+   ["SCATT","Rutina + "+FB+" (2 series)","30 disparos en SCATT con rutina completa · Visualización de la tirada 10 min"],
+   ["SCATT","SIMULACRO SCATT","Calentamiento de competición · Simulacro completo: 15 min de preparación y ensayo + 60 disparos en 75 min"]],
+11:[["Galería","Tiro: presión","Diez seguidos de 9 o más (límite 30 min) · 20 disparos con rutina completa"],
+   ["SCATT","Parada + "+FA+" (2 series)","Pared blanca ×20 · Zona de puntería ×15"],
+   ["Galería","SIMULACRO REAL","Medio simulacro: 10 min de ensayo + 30 disparos en 38 min. Completo (15 + 75 min) si puedes alargar"],
+   ["SCATT","Rutina + "+FB+" (2 series)","30 disparos en SCATT con rutina completa · Visualización de la tirada 10 min"],
+   ["SCATT","SIMULACRO SCATT","Calentamiento de competición · Simulacro completo: 15 min de preparación y ensayo + 60 disparos en 75 min"]],
+12:[["Galería","Tiro de calidad","30–40 disparos con rutina completa, sin puntuar"],
+   ["SCATT","SCATT + movilidad","30 min con rutina completa · Movilidad 10 min. Sin físico de fuerza"],
+   ["Galería","Tiro de calidad","20–30 disparos con rutina de competición. Acabar en un buen disparo"],
+   ["SCATT","SCATT + visualización","20 min con rutina completa · Visualización 10 min"],
+   ["SCATT","MEDIO SIMULACRO","Calentamiento de competición · Medio simulacro en SCATT: 10 min de ensayo + 30 disparos en 38 min"]],
+13:[["Galería","Tiro de calidad","30 disparos con rutina completa, sin sumar puntos"],
+   ["SCATT","SCATT + movilidad","30 min con rutina completa · Movilidad 10 min"],
+   ["Galería","Último tiro","Calentamiento abreviado + 20 disparos. Acabar en un buen disparo y recoger"],
+   ["SCATT","SCATT + visualización","20 min · Visualización de la tirada completa · Preparar la bolsa con la lista de material"],
+   ["Competición","COMPETICIÓN","Víspera: descanso o 10 min de seco · Día de tirada: calentamiento de competición completo · Competición: 15 min + 60 disparos en 75 min"]]
+};
+const DAYN=["Lun","Mar","Mié","Jue","Finde"];
+const START=new Date(2026,10,16), COMP=new Date(2027,1,13);
+const dayDiff=(a,b)=>Math.round((new Date(a.getFullYear(),a.getMonth(),a.getDate())-new Date(b.getFullYear(),b.getMonth(),b.getDate()))/864e5);
+function posOf(dt){const d=dayDiff(dt,START);const w=Math.floor(d/7)+1;const dow=((d%7)+7)%7;return{w:Math.max(0,Math.min(13,w)),d:Math.min(dow,4),inPlan:w>=0&&w<=13};}
+const todayPos=()=>posOf(new Date());
+const phaseOf=w=>w<=0?0:w<=4?1:w<=8?2:w<=11?3:4;
+const MES=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const fd=d=>d.getDate()+" "+MES[d.getMonth()];
+const wkStart=w=>new Date(2026,10,16+(w-1)*7);
+const isoToday=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");};
+const parseIso=s=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s||"");return m?new Date(+m[1],+m[2]-1,+m[3]):null;};
+
+/* ---------------- sequences: warm-ups, mobility, physical ---------------- */
+const MOV_SHORT=[
+ ["Tobillos",20,"Círculos con cada pie, 10 hacia cada lado"],
+ ["Rodillas",20,"Pies juntos, manos en las rodillas, círculos suaves"],
+ ["Cadera · movimiento",20,"Manos en la cintura, círculos amplios de cadera"],
+ ["Cadera · giro",20,"Sube la rodilla y ábrela hacia fuera; alterna piernas"],
+ ["Torsión de tronco",20,"Brazos sueltos, gira el tronco a cada lado sin mover la cadera"],
+ ["Muñecas",20,"Dedos entrelazados: círculos y flexión-extensión"],
+ ["Codos",20,"Flexión-extensión y círculos de antebrazo"],
+ ["Hombros",25,"Círculos hacia atrás y hacia delante, después brazos cruzados"],
+ ["Cuello",15,"Sí, no y oreja al hombro, despacio. Sin círculos completos"]];
+const MOV_COMP=[
+ ["Caminar suave",60,"Paso relajado, suelta los brazos"],
+ ["Tobillos",40,"Círculos con cada pie y talón-punta"],
+ ["Rodillas",40,"Pies juntos, manos en las rodillas, círculos suaves y media sentadilla"],
+ ["Cadera · movimiento",45,"Manos en la cintura, círculos amplios de cadera en los dos sentidos"],
+ ["Cadera · giro",45,"Sube la rodilla y ábrela hacia fuera, después hacia dentro; alterna"],
+ ["Torsión de tronco",50,"Brazos sueltos, gira el tronco a cada lado sin mover la cadera"],
+ ["Muñecas",40,"Dedos entrelazados: círculos, flexión y extensión"],
+ ["Codos",40,"Flexión-extensión y círculos de antebrazo"],
+ ["Hombros",75,"Círculos hacia atrás y hacia delante, brazos cruzados y apertura de pecho"],
+ ["Cuello",45,"Sí, no y oreja al hombro, despacio. Sin círculos completos"]];
+const mv=(a)=>a.map(x=>({n:"Movilidad · "+x[0],s:x[1],k:"move",d:x[2],lab:"Movilidad"}));
+const ACT_SHORT=[
+ {n:"Rotadores con goma · brazo de tiro",s:30,k:"work",d:"Codo pegado y a 90°, 12 repeticiones lentas",lab:"12 repeticiones"},
+ {n:"Rotadores con goma · otro brazo",s:30,k:"work",d:"Codo pegado y a 90°, 12 repeticiones lentas",lab:"12 repeticiones"},
+ {n:"Brazo de tiro extendido",s:10,k:"work",d:"Sin peso, como en posición de tiro",lab:"Aguanta"},
+ {n:"Suelta el brazo",s:10,k:"rest",d:"",lab:"Descansa"},
+ {n:"Brazo de tiro extendido",s:10,k:"work",d:"Sin peso, como en posición de tiro",lab:"Aguanta"},
+ {n:"Sacude los brazos",s:30,k:"rest",d:"Suelta hombros y manos",lab:"Suelta"}];
+const ACT_COMP=[
+ {n:"Rotadores con goma · brazo de tiro",s:35,k:"work",d:"Codo pegado y a 90°, 12 repeticiones",lab:"12 repeticiones"},
+ {n:"Rotadores con goma · otro brazo",s:35,k:"work",d:"Codo pegado y a 90°, 12 repeticiones",lab:"12 repeticiones"},
+ {n:"Brazo de tiro extendido 1/3",s:10,k:"work",d:"Sin peso",lab:"Aguanta"},{n:"Suelta el brazo",s:15,k:"rest",d:"",lab:"Descansa"},
+ {n:"Brazo de tiro extendido 2/3",s:10,k:"work",d:"Sin peso",lab:"Aguanta"},{n:"Suelta el brazo",s:15,k:"rest",d:"",lab:"Descansa"},
+ {n:"Brazo de tiro extendido 3/3",s:10,k:"work",d:"Sin peso",lab:"Aguanta"},{n:"Suelta el brazo",s:15,k:"rest",d:"",lab:"Descansa"},
+ {n:"Plancha",s:20,k:"work",d:"Cuerpo en línea, sin llegar a fatiga",lab:"Aguanta"},{n:"Ponte de pie",s:15,k:"rest",d:"",lab:"Cambio"},
+ {n:"Equilibrio · pierna derecha",s:30,k:"work",d:"Ojos cerrados, cerca de una pared",lab:"Equilibrio"},
+ {n:"Equilibrio · pierna izquierda",s:30,k:"work",d:"Ojos cerrados, cerca de una pared",lab:"Equilibrio"},
+ {n:"Respira y sacude los brazos",s:60,k:"rest",d:"Suelta hombros y manos",lab:"Suelta"}];
+const EX={
+ frontal:{n:"Elevación frontal isométrica",sets:4,sides:["brazo de tiro","otro brazo"],w:35,r:10,lab:"Aguanta",d:"Mancuerna de 1,5–2 kg, brazo en posición de tiro, hombro bajo y muñeca firme"},
+ rotext:{n:"Rotación externa con goma",sets:3,sides:["brazo de tiro","otro brazo"],w:30,r:10,lab:"15 repeticiones",d:"Codo pegado al costado y a 90°; gira hacia fuera y vuelve controlando"},
+ lat:{n:"Elevaciones laterales",sets:3,w:45,r:30,lab:"12 repeticiones",d:"Hasta la altura de los hombros: 1 s arriba y 3 s bajando"},
+ muneca:{n:"Flexión y extensión de muñeca",sets:3,sides:["brazo de tiro","otro brazo"],w:30,r:10,lab:"15 repeticiones",d:"Antebrazo en la mesa. Alterna palma arriba y palma abajo en cada serie"},
+ plank:{n:"Plancha frontal",sets:3,w:40,r:20,lab:"Aguanta",d:"Codos bajo los hombros, cuerpo en línea, sin hundir la cadera"},
+ side:{n:"Plancha lateral",sets:3,sides:["lado derecho","lado izquierdo"],w:30,r:10,lab:"Aguanta",d:"Codo bajo el hombro y cadera alta. Si cuesta, apoya la rodilla"},
+ bird:{n:"Bird-dog",sets:3,sides:["brazo dcho + pierna izda","brazo izdo + pierna dcha"],w:30,r:10,lab:"10 repeticiones",d:"Pausa de 2 s con brazo y pierna estirados, sin girar la cadera"},
+ puente:{n:"Puente de glúteo",sets:3,w:45,r:20,lab:"15 repeticiones",d:"Sube hasta alinear rodillas, cadera y hombros; aprieta 1 s arriba"},
+ bal:{n:"Equilibrio a una pierna",sets:3,sides:["pierna derecha","pierna izquierda"],w:30,r:5,lab:"Ojos cerrados",d:"Cerca de una pared. Corrige desde el tobillo"},
+ estirA:{n:"Estiramientos de brazo",fixed:[["Hombro · brazo de tiro","Cruza el brazo por delante del pecho"],["Hombro · otro brazo","Cruza el brazo por delante del pecho"],
+   ["Antebrazo · brazo de tiro","Brazo estirado, tira suave de los dedos hacia ti"],["Antebrazo · otro brazo","Brazo estirado, tira suave de los dedos hacia ti"],
+   ["Pectoral · derecho","Antebrazo en el marco de una puerta, gira el pecho hacia fuera"],["Pectoral · izquierdo","Antebrazo en el marco de una puerta, gira el pecho hacia fuera"]]},
+ lumbar:{n:"Estiramiento lumbar y de cadera",fixed:[["Rodilla derecha al pecho","Tumbado boca arriba"],["Rodilla izquierda al pecho","Tumbado boca arriba"],
+   ["Flexor de cadera · derecho","Zancada con rodilla en el suelo, cadera adelante"],["Flexor de cadera · izquierdo","Zancada con rodilla en el suelo, cadera adelante"],
+   ["Las dos rodillas al pecho","Tumbado, balancéate suave"],["Torsión tumbado","Rodillas a un lado y mirada al otro; cambia a los 15 s"]]}
+};
+function expandEx(id,short){const e=EX[id],st=[];
+  if(e.fixed){const list=short?e.fixed.slice(0,4):e.fixed;list.forEach(f=>st.push({n:e.n+" · "+f[0],s:30,k:"work",d:f[1],lab:"Estira"}));return st;}
+  const sets=short?2:e.sets,sides=e.sides||[null];
+  for(let s=1;s<=sets;s++)sides.forEach((sd,j)=>{
+    st.push({n:e.n,sub:(sd?sd+" · ":"")+"serie "+s+" de "+sets,s:e.w,k:"work",d:e.d,lab:e.lab});
+    const last=s===sets&&j===sides.length-1;
+    if(!last)st.push({n:e.n,sub:sides.length>1?"Cambia: "+(sides[(j+1)%sides.length]):"Descansa",s:e.r,k:"rest",d:"",lab:sides.length>1?"Cambia":"Descansa"});});
+  return st;}
+function block(ids,short){const st=[];ids.forEach((id,i)=>{if(i>0)st.push({n:"Prepara: "+EX[id].n,s:15,k:"rest",d:EX[id].d||"",lab:"Cambio"});st.push(...expandEx(id,short));});return st;}
+const BLOCKA=["frontal","rotext","lat","muneca","estirA"],BLOCKB=["plank","side","bird","puente","bal","lumbar"];
+function getSeq(id,short){
+  switch(id){
+   case"movShort":return{name:"Movilidad por zonas",steps:mv(MOV_SHORT)};
+   case"movComp":return{name:"Movilidad por zonas (competición)",steps:mv(MOV_COMP)};
+   case"actShort":return{name:"Activación corta",steps:ACT_SHORT};
+   case"actComp":return{name:"Activación de competición",steps:ACT_COMP};
+   case"calShort":return{name:"Calentamiento corto de sesión",steps:[...mv(MOV_SHORT),...ACT_SHORT,
+     {n:"Respiración 4–6",s:60,k:"breath",d:"6 respiraciones lentas. Decide el objetivo único de la sesión",lab:"Respira"},
+     {n:"Punto natural",s:60,k:"work",d:"Posición, levanta con ojos cerrados, abre y corrige con los pies. 3 veces",lab:"3 veces"},
+     {n:"Seco",s:180,k:"work",d:"10 levantadas con parada y suelta contra pared blanca",lab:"10 levantadas"}]};
+   case"calComp":return{name:"Calentamiento de competición",steps:[...mv(MOV_COMP),...ACT_COMP,
+     {n:"Respiración 4–6",s:180,k:"breath",d:"4 s dentro, 6 s fuera",lab:"Respira"},
+     {n:"Visualización",s:120,k:"work",d:"5 disparos imaginados con la rutina completa, en tiempo real",lab:"Visualiza"},
+     {n:"Al puesto",s:420,k:"move",d:"Material colocado, marcar los pies y punto natural con ojos cerrados. Al acabar empieza la preparación",lab:"Al puesto"}]};
+   case"blockA":return{name:"Bloque físico A"+(short?" · 2 series":""),steps:block(BLOCKA,short)};
+   case"blockB":return{name:"Bloque físico B"+(short?" · 2 series":""),steps:block(BLOCKB,short)};
+   default:if(EX[id])return{name:EX[id].n,steps:expandEx(id,short)};}
+  return null;}
+const seqMin=st=>Math.round(st.reduce((a,b)=>a+b.s,0)/60);
+
+/* map a programme line to a timer */
+function presetFor(t,w){let m;const ph=phaseOf(w);
+  if(m=t.match(/Bloque físico ([AB])/))return{k:"seq",o:{id:"block"+m[1],short:ph>=3}};
+  if(/Calentamiento de competición|calentamiento de competición/.test(t))return{k:"seq",o:{id:"calComp"}};
+  if(/Movilidad/.test(t))return{k:"seq",o:{id:"movComp"}};
+  if(m=t.match(/Parada larga (\d+) × (\d+) s/))return{k:"hold",o:{reps:+m[1],hold:+m[2],rest:40,name:"Parada larga"}};
+  if(m=t.match(/Sobrecarga (\d+) × (\d+) s/))return{k:"hold",o:{reps:+m[1],hold:+m[2],rest:40,name:"Sobrecarga"}};
+  if(m=t.match(/Suelta en pared blanca ×(\d+)/))return{k:"win",o:{reps:+m[1],name:"Suelta en pared blanca"}};
+  if(m=t.match(/Pared blanca ×(\d+)/))return{k:"hold",o:{reps:+m[1],hold:12,name:"Pared blanca"}};
+  if(m=t.match(/Zona de puntería ×(\d+)/))return{k:"hold",o:{reps:+m[1],hold:12,name:"Zona de puntería"}};
+  if(m=t.match(/Equilibrio ×(\d+)/))return{k:"hold",o:{reps:+m[1],hold:12,name:"Equilibrio"}};
+  if(m=t.match(/Ojos cerrados ×(\d+)/))return{k:"win",o:{reps:+m[1],name:"Ojos cerrados"}};
+  if(/Señal externa/.test(t))return{k:"signal"};
+  if(/Abortos obligados/.test(t))return{k:"dice"};
+  if(/Disparo único/.test(t))return{k:"single"};
+  if(/15 min.*60 disparos|Simulacro completo|Completo \(15/.test(t)&&!/Medio/.test(t))return{k:"full"};
+  if(/Medio simulacro|30 disparos en 38/.test(t))return{k:"half"};
+  if(/40 disparos en 50|40 disparos puntuados|4 series de 10/.test(t))return{k:"control"};
+  if(/Ventana de tiempo|regla de los 8 s|Regla de los 8 s|Presión continua|Solo dieces|levantadas con disparo|disparos/.test(t))return{k:"win"};
+  return null;}
+
+let cur=todayPos(), selW=cur.w, selD=cur.d;
+function sessionItems(w,d){const s=W[w][d];if(!s)return null;
+  const items=s[2].split(" · ");const m=s[1].match(/Físico ([AB])( \(2 series\))?/);
+  if(m)items.push("Bloque físico "+m[1]+(m[2]?" · 2 series por ejercicio":"")+" (al final)");
+  return{place:s[0],title:s[1],items};}
+const key=(w,d,i)=>"w"+w+"d"+d+"i"+i;
+function dayDone(w,d){const s=sessionItems(w,d);if(!s)return false;return s.items.every((_,i)=>store.done[key(w,d,i)]);}
+function renderHoy(){
+  const now=new Date(),left=dayDiff(COMP,now);
+  $("hoyTitle").textContent=cur.inPlan?"Hoy · "+fd(now):"Plan de entrenamiento";
+  $("hoySub").textContent=cur.inPlan?"Semana "+cur.w+" · Fase "+phaseOf(cur.w)+": "+PH[phaseOf(cur.w)]:"Fuera de las fechas del plan";
+  $("countdown").textContent=left>0?"Faltan "+left+" días":left===0||left===-1?"Competición":"Plan terminado";
+  const ws=wkStart(selW),we=new Date(ws.getFullYear(),ws.getMonth(),ws.getDate()+6);
+  $("wkTitle").textContent=selW===0?"Semana 0 · 11 nov – 15 nov":"Semana "+selW+" · "+fd(ws)+" – "+fd(we);
+  $("wkPhase").textContent="Fase "+phaseOf(selW)+": "+PH[phaseOf(selW)]+(selW===4||selW===8?" · descarga":"")+(selW===10?" · material cerrado":"");
+  $("wkPrev").disabled=selW<=0;$("wkNext").disabled=selW>=13;
+  let n=0,tot=0,h="";
+  for(let d=0;d<5;d++){const s=W[selW][d];if(s){tot++;if(dayDone(selW,d))n++;}
+    const dd=new Date(ws.getFullYear(),ws.getMonth(),ws.getDate()+d);
+    h+='<button data-day="'+d+'" class="'+(d===selD?"sel":"")+'"'+(s?"":" disabled")+'>'+DAYN[d]+'<small>'+(d<4?dd.getDate():"V–D")+'</small><span class="dot'+(s&&dayDone(selW,d)?" full":"")+'"></span></button>';}
+  $("days").innerHTML=h;$("wkBar").style.width=(tot?Math.round(n/tot*100):0)+"%";
+  const s=sessionItems(selW,selD),c=$("sessCard");
+  if(!s){c.innerHTML='<h3>Sin sesión</h3><p class="mute">Esta semana no tenía sesión ese día.</p>';return;}
+  let o='<div class="row between"><h3>'+esc(s.title)+'</h3><span class="pill">'+esc(s.place)+'</span></div>';
+  s.items.forEach((t,i)=>{const k=key(selW,selD,i),p=presetFor(t,selW);
+    o+='<div class="item'+(store.done[k]?" done":"")+'"><input type="checkbox" id="'+k+'" data-k="'+k+'"'+(store.done[k]?" checked":"")+'><label class="tx" for="'+k+'">'+esc(t)+'</label>';
+    if(p)o+='<button class="sm" data-preset="'+p.k+'" data-o="'+esc(JSON.stringify(p.o||{}))+'">Timer</button>';
+    o+='</div>';});
+  c.innerHTML=o;}
+
+/* ---------------- audio ---------------- */
+let AC=null;
+function audio(){try{if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();if(AC.state==="suspended")AC.resume();}catch(e){}return AC;}
+function tone(f,dur,delay,vol){const a=AC;if(!a)return;try{const o=a.createOscillator(),g=a.createGain(),t=a.currentTime+(delay||0);
+  o.type="sine";o.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol||.9,t+.01);g.gain.setValueAtTime(vol||.9,t+dur-.03);g.gain.linearRampToValueAtTime(0,t+dur);
+  o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+dur+.02);}catch(e){}}
+const vib=p=>{try{if($("optVib").checked&&navigator.vibrate)navigator.vibrate(p);}catch(e){}};
+const S={up:()=>{tone(880,.18);vib(120);},zone:()=>{tone(660,.09,0,.6);},mid:()=>{tone(520,.06,0,.35);},
+  down:()=>{tone(880,.16);tone(880,.16,.24);vib([120,80,120]);},abort:()=>{tone(260,.6);vib(500);},
+  dice:()=>{tone(300,.2);tone(240,.3,.25);vib([200,80,300]);},end:()=>{tone(880,.16);tone(880,.16,.24);tone(1175,.4,.48);vib([120,80,120,80,300]);},
+  long:()=>{tone(700,.8);vib(600);},soft:f=>tone(f,.25,0,.25),tick:()=>tone(1000,.05,0,.4),ok:()=>tone(990,.07,0,.4)};
+let wl=null;
+async function wake(on){try{if(on&&navigator.wakeLock)wl=await navigator.wakeLock.request("screen");else if(wl){await wl.release();wl=null;}}catch(e){}}
+
+/* ---------------- shot pad (semáforo + anuncio) ---------------- */
+const CN={v:"Verde",a:"Amarillo",r:"Rojo",x:"Aborto"};
+function padHtml(){return '<div class="cols">'+
+  '<button class="c-v" data-shot="v"><b id="@v">0</b><span>Verde</span></button>'+
+  '<button class="c-a" data-shot="a"><b id="@a">0</b><span>Amarillo</span></button>'+
+  '<button class="c-r" data-shot="r"><b id="@r">0</b><span>Rojo</span></button>'+
+  '<button class="c-x" data-shot="x"><b id="@x">0</b><span>Aborto</span></button></div>'+
+  '<div class="an"><span class="mute">Anuncio</span><button data-an="1">Acertado <span class="pill" data-cnt="ok">0</span></button><button data-an="0">Fallado <span class="pill" data-cnt="ko">0</span></button><button class="sm" data-undo aria-label="Deshacer último">↶</button></div>'+
+  '<div class="st"><span data-last>Marca el color tras cada disparo, antes de mirar el impacto.</span><span><b data-cnt="shots">0</b> disparos · rojos/10 <b data-cnt="r10">–</b></span></div>';}
+document.querySelectorAll("[data-pad]").forEach(p=>{p.innerHTML=padHtml().replace(/id="@(\w)"/g,'data-cnt="$1"');});
+function counts(){const c={v:0,a:0,r:0,x:0,ok:0,ko:0};store.log.forEach(e=>{c[e.c]++;if(e.an===1)c.ok++;else if(e.an===0)c.ko++;});c.shots=c.v+c.a+c.r;return c;}
+function renderPads(){const c=counts();
+  document.querySelectorAll("[data-cnt]").forEach(el=>{const k=el.dataset.cnt;el.textContent=k==="r10"?(c.shots?(c.r/c.shots*10).toFixed(1):"–"):c[k];});
+  const last=store.log[store.log.length-1],pend=last&&last.c!=="x"&&last.an==null;
+  document.querySelectorAll("[data-an]").forEach(b=>b.classList.toggle("hot",!!pend));
+  document.querySelectorAll("[data-last]").forEach(el=>{el.textContent=!last?"Marca el color tras cada disparo, antes de mirar el impacto.":
+    "Último: "+CN[last.c]+(last.c==="x"?"":last.an==null?" · marca el anuncio":last.an?" · anuncio acertado":" · anuncio fallado");});
+  syncForm(c);drawShots();}
+function logShot(c){audio();store.log.push({c,an:null,t:Date.now()});store.acts.push({k:"shot"});save();S.ok();vib(40);renderPads();
+  if(T&&(T.phase==="hold"||T.phase==="prep")&&!T.paused){T.logged=true;toRest();}}
+function logAn(v){let i=store.log.length-1;while(i>=0&&(store.log[i].c==="x"||store.log[i].an!=null))i--;
+  if(i<0){document.querySelectorAll("[data-last]").forEach(el=>el.textContent="Marca primero el color del disparo.");return;}
+  store.log[i].an=v;store.acts.push({k:"an",i});save();vib(30);renderPads();}
+function undo(){const a=store.acts.pop();if(!a){store.log.pop();}else if(a.k==="an"){if(store.log[a.i])store.log[a.i].an=null;}else store.log.pop();save();renderPads();}
+
+/* ---------------- interval timer (shooting) ---------------- */
+const PRE={
+ hold:{name:"Parada",desc:"Sube, mantén y baja a la señal",reps:20,prep:6,hold:12,rest:35,holdL:"Parada (s)",ph:["Sube","Parada","Descanso"],pad:false,
+   leg:[["1 pitido","Sube y baja a tu zona"],["Clic","En zona: empieza la parada"],["2 pitidos","Baja y descansa"],["3 pitidos","Fin del ejercicio"]]},
+ win:{name:"Ventana de 8 s",desc:"Aviso a los 4 s y orden de bajar a los 8 s",reps:20,prep:8,hold:8,rest:35,mid:4,holdL:"Ventana (s)",ph:["Sube","Puntería","Descanso"],pad:true,
+   leg:[["1 pitido","Sube y baja a tu zona"],["Clic","En zona: presión continua"],["Clic suave","4 s: el disparo debería estar saliendo"],["2 pitidos","8 s: baja, haya salido o no"],["Color","Al marcarlo pasa directo al descanso"]]},
+ signal:{name:"Señal externa",desc:"Tono grave al azar: baja sin disparar",reps:20,prep:8,hold:8,rest:35,mid:4,abortPct:40,holdL:"Ventana (s)",ph:["Sube","Puntería","Descanso"],pad:true,
+   leg:[["1 pitido","Sube y baja a tu zona"],["Tono grave largo","Baja ya, sin disparar (4 de cada 10, al azar). Marca Aborto"],["2 pitidos","8 s: baja"]]},
+ dice:{name:"Abortos obligados",desc:"1 de cada 3 levantadas se aborta",reps:30,prep:8,hold:8,rest:35,mid:4,dice:1,holdL:"Ventana (s)",ph:["Sube","Puntería","Descanso"],pad:true,
+   leg:[["1 pitido","Levantada normal: dispara si está"],["2 tonos graves","Aborto obligado: apunta y baja sin disparar. Marca Aborto"],["2 pitidos","8 s: baja"]]},
+ single:{name:"Disparo único",desc:"Un disparo a la orden y 2 min de espera",reps:10,prep:6,hold:50,rest:120,randPrep:1,holdL:"Tiempo (s)",ph:["Atento","Dispara","Espera"],pad:true,
+   leg:[["1 pitido","Atento: la orden llega en unos segundos"],["Clic","Orden: tienes el tiempo marcado para un disparo"],["2 pitidos","Tiempo agotado"]]}
+};
+let cfg=null,T=null,mode="i";
+function showPanel(p){mode=p;
+  $("intervalPanel").style.display=p==="i"?"flex":"none";$("seqPanel").style.display=p==="s"?"flex":"none";
+  $("matchPanel").style.display=p==="m"?"flex":"none";$("breathPanel").style.display=p==="b"?"flex":"none";
+  $("cfgCard").style.display=p==="i"?"flex":"none";$("seqLegend").style.display=p==="s"?"flex":"none";
+  $("padT").style.display=(p==="m"||(p==="i"&&cfg&&cfg.pad))?"flex":"none";}
+function loadPreset(k,o){stopAll();o=o||{};
+  if(k==="full"||k==="half"||k==="control"){loadMatch(k);return;}
+  if(k==="breath"){cfg=null;showPanel("b");$("tName").textContent="Respiración 4–6 · 3 minutos";return;}
+  if(k==="seq"){loadSeq(o.id,o.short);return;}
+  cfg=Object.assign({},PRE[k],o);showPanel("i");
+  $("tName").textContent=cfg.name+" · "+cfg.desc;
+  $("cReps").value=cfg.reps;$("cPrep").value=cfg.prep;$("cHold").value=cfg.hold;$("cRest").value=cfg.rest;
+  $("cHoldL").firstChild.textContent=cfg.holdL;
+  $("legend").innerHTML=cfg.leg.map(l=>"<b>"+l[0]+"</b><span>"+l[1]+"</span>").join("");
+  drawIdle();}
+function drawIdle(){$("dial").className="dial";$("dPh").textContent="Listo";$("dNum").textContent=cfg?$("cReps").value:"0";$("dSub").textContent=cfg?"repeticiones":"—";
+  $("tStart").disabled=!cfg;$("tPause").disabled=true;$("tStop").disabled=true;$("tPause").textContent="Pausa";}
+const num=(id,min,def)=>{const v=parseInt($(id).value,10);return isNaN(v)||v<min?def:v;};
+function startInterval(){if(!cfg)return;audio();wake(true);
+  cfg.reps=num("cReps",1,cfg.reps);cfg.prep=num("cPrep",0,cfg.prep);cfg.hold=num("cHold",1,cfg.hold);cfg.rest=num("cRest",0,cfg.rest);
+  T={rep:0,phase:"",end:0,paused:0,t:setInterval(tick,100)};nextRep();
+  $("tStart").disabled=true;$("tPause").disabled=false;$("tStop").disabled=false;}
+function setPhase(ph,secs){T.phase=ph;T.start=performance.now();T.end=T.start+secs*1000;T.midDone=false;}
+function nextRep(){T.rep++;T.aborted=false;T.logged=false;
+  if(T.rep>cfg.reps){finish();return;}
+  T.forced=!!cfg.dice&&Math.random()<1/3;
+  T.abortAt=(cfg.abortPct&&Math.random()*100<cfg.abortPct)?1.5+Math.random()*Math.max(.5,cfg.hold-3):0;
+  const prep=cfg.randPrep?cfg.prep+Math.random()*5:cfg.prep;
+  if(T.forced)S.dice();else S.up();
+  if(prep>0)setPhase("prep",prep);else{S.zone();setPhase("hold",cfg.hold);}}
+function toRest(){if(cfg.rest>0&&T.rep<cfg.reps)setPhase("rest",cfg.rest);else nextRep();}
+function tick(){if(!T||T.paused)return;const now=performance.now(),left=(T.end-now)/1000,el=(now-T.start)/1000,d=$("dial");
+  if(T.phase==="hold"){
+    if(cfg.mid&&!T.midDone&&el>=cfg.mid&&!T.forced){T.midDone=true;S.mid();}
+    if(T.abortAt&&el>=T.abortAt){T.abortAt=0;S.abort();T.aborted=true;toRest();return;}}
+  if(left<=0){
+    if(T.phase==="prep"){S.zone();setPhase("hold",cfg.hold);}
+    else if(T.phase==="hold"){S.down();toRest();}
+    else nextRep();
+    if(!T)return;}
+  const L=Math.max(0,(T.end-performance.now())/1000);
+  d.className="dial "+(T.phase==="rest"&&T.aborted?"abort":T.forced&&T.phase!=="rest"?"abort":T.phase);
+  $("dPh").textContent=T.phase==="rest"&&T.aborted?"Abortado":T.phase==="rest"&&T.logged?"Registrado":T.forced&&T.phase==="prep"?"Aborto":T.forced&&T.phase==="hold"?"No dispares":cfg.ph[T.phase==="prep"?0:T.phase==="hold"?1:2];
+  $("dNum").textContent=Math.ceil(L);
+  $("dSub").textContent="Repetición "+Math.min(T.rep,cfg.reps)+" de "+cfg.reps;}
+function finish(){S.end();clearInterval(T.t);T=null;wake(false);$("dial").className="dial";$("dPh").textContent="Hecho";$("dNum").textContent="✓";$("dSub").textContent=cfg.reps+" repeticiones";
+  $("tStart").disabled=false;$("tPause").disabled=true;$("tStop").disabled=true;}
+function pauseInterval(){if(!T)return;if(T.paused){const dt=performance.now()-T.paused;T.end+=dt;T.start+=dt;T.paused=0;$("tPause").textContent="Pausa";}
+  else{T.paused=performance.now();$("tPause").textContent="Seguir";}}
+
+/* ---------------- sequence timer ---------------- */
+let SQ=null,sqDef=null;
+const mmss=s=>{s=Math.max(0,Math.ceil(s));return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");};
+function loadSeq(id,short){sqDef=getSeq(id,short);if(!sqDef)return;cfg=null;showPanel("s");
+  $("tName").textContent=sqDef.name+" · "+sqDef.steps.length+" pasos · "+seqMin(sqDef.steps)+" min";drawSeqIdle();}
+function drawSeqIdle(){const f=sqDef.steps[0];$("sDial").className="dial";$("sDial").style.transform="";
+  $("sName").textContent=f.n;$("sCue").textContent=f.sub?f.sub+(f.d?" · "+f.d:""):f.d;
+  $("sPh").textContent="Listo";$("sNum").textContent=mmss(sqDef.steps.reduce((a,b)=>a+b.s,0));$("sSub").textContent="duración total";
+  $("sNext").textContent="";$("sBar").style.width="0%";
+  $("sStart").disabled=false;$("sPause").disabled=true;$("sSkip").disabled=true;$("sStop").disabled=true;$("sPause").textContent="Pausa";}
+function startSeq(){audio();wake(true);SQ={i:-1,paused:0,t:setInterval(sTick,100)};sStep(0);
+  $("sStart").disabled=true;$("sPause").disabled=false;$("sSkip").disabled=false;$("sStop").disabled=false;}
+function sStep(i){const st=sqDef.steps;SQ.i=i;
+  if(i>=st.length){S.end();clearInterval(SQ.t);SQ=null;wake(false);$("sDial").className="dial";$("sDial").style.transform="";
+    $("sPh").textContent="Hecho";$("sNum").textContent="✓";$("sSub").textContent=sqDef.name;$("sNext").textContent="";$("sBar").style.width="100%";
+    $("sStart").disabled=false;$("sPause").disabled=true;$("sSkip").disabled=true;$("sStop").disabled=true;
+    if(/competición/.test(sqDef.name))$("sCue").textContent="Abre el reloj de competición para la preparación y el ensayo.";return;}
+  const s=st[i];SQ.start=performance.now();SQ.end=SQ.start+s.s*1000;SQ.ticks=0;SQ.bph="";
+  if(s.k==="rest")S.down();else S.up();
+  $("sName").textContent=s.n;$("sCue").textContent=s.sub?s.sub+(s.d?" · "+s.d:""):s.d;
+  const nx=st[i+1];$("sNext").textContent=nx?"Siguiente: "+nx.n+(nx.sub?" · "+nx.sub:""):"Último paso";
+  $("sDial").className="dial "+(s.k==="rest"?"rest":s.k==="move"?"prep":"hold");$("sDial").style.transform="";}
+function sTick(){if(!SQ||SQ.paused)return;const s=sqDef.steps[SQ.i],now=performance.now(),left=(SQ.end-now)/1000,el=(now-SQ.start)/1000;
+  if(left<=0){sStep(SQ.i+1);return;}
+  if(s.k!=="rest"&&left<=3&&SQ.ticks<3&&Math.ceil(left)===3-SQ.ticks){SQ.ticks++;S.tick();}
+  let lab=s.lab;
+  if(s.k==="breath"){const c=el%10,ph=c<4?"in":"out";lab=ph==="in"?"Inspira":"Espira";
+    if(ph!==SQ.bph){SQ.bph=ph;S.soft(ph==="in"?440:330);const d=$("sDial");d.style.transitionDuration=(ph==="in"?4:6)+"s";d.style.transform=ph==="in"?"scale(1.06)":"scale(.9)";}}
+  $("sPh").textContent=lab;$("sNum").textContent=s.s>=60?mmss(left):Math.ceil(left);
+  const tot=sqDef.steps.reduce((a,b)=>a+b.s,0),done=sqDef.steps.slice(0,SQ.i).reduce((a,b)=>a+b.s,0)+el;
+  $("sSub").textContent="Paso "+(SQ.i+1)+" de "+sqDef.steps.length+" · quedan "+mmss(tot-done);
+  $("sBar").style.width=Math.min(100,done/tot*100).toFixed(1)+"%";}
+function pauseSeq(){if(!SQ)return;if(SQ.paused){const dt=performance.now()-SQ.paused;SQ.end+=dt;SQ.start+=dt;SQ.paused=0;$("sPause").textContent="Pausa";}
+  else{SQ.paused=performance.now();$("sPause").textContent="Seguir";}}
+
+/* ---------------- match clock ---------------- */
+const MP={full:{name:"Simulacro completo",desc:"15 min + 60 disparos en 75 min",prep:15,main:75,shots:60},
+  half:{name:"Medio simulacro",desc:"10 min + 30 disparos en 38 min",prep:10,main:38,shots:30},
+  control:{name:"Control",desc:"10 min + 40 disparos en 50 min",prep:10,main:50,shots:40}};
+let mc=MP.full,M=null,mBase=0;
+function loadMatch(k){mc=MP[k];cfg=null;showPanel("m");$("tName").textContent=mc.name+" · "+mc.desc;drawMatchIdle();}
+const mShots=()=>Math.max(0,counts().shots-mBase);
+function drawShots(){if(!$("mShots"))return;$("mShots").textContent=(M&&M.phase==="main"?mShots():0)+" / "+mc.shots;}
+function drawMatchIdle(){$("mDial").className="dial";$("mPh").textContent="Listo";$("mNum").textContent=mmss(mc.prep*60);$("mSub").textContent="Preparación y ensayo";
+  $("mShots").textContent="0 / "+mc.shots;$("mPace").textContent="Cada color que marques en la tirada cuenta un disparo";
+  $("mStart").disabled=false;$("mNext").disabled=true;$("mStop").disabled=true;}
+function mPhase(p){M.phase=p;M.start=performance.now();M.dur=(p==="prep"?mc.prep:mc.main)*60;M.w10=M.w5=M.w30=false;S.long();$("mNext").disabled=p!=="prep";
+  if(p==="main"){mBase=counts().shots;drawShots();}}
+function startMatch(){audio();wake(true);M={t:setInterval(mTick,250)};mPhase("prep");$("mStart").disabled=true;$("mStop").disabled=false;}
+function mTick(){if(!M)return;const el=(performance.now()-M.start)/1000,left=M.dur-el;
+  if(M.phase==="prep"){if(!M.w30&&left<=30){M.w30=true;S.up();}
+    if(left<=0){mPhase("main");return;}}
+  else{if(!M.w10&&left<=600){M.w10=true;S.down();}if(!M.w5&&left<=300){M.w5=true;S.down();}
+    if(left<=0){S.end();clearInterval(M.t);M=null;wake(false);$("mPh").textContent="Fin";$("mNum").textContent="0:00";$("mStart").disabled=false;$("mStop").disabled=true;return;}}
+  $("mDial").className="dial "+(M.phase==="prep"?"prep":left<=300?"abort":"hold");
+  $("mPh").textContent=M.phase==="prep"?"Ensayo":"Tirada";$("mNum").textContent=mmss(left);
+  const sh=M.phase==="main"?mShots():0;
+  $("mSub").textContent=M.phase==="prep"?"Los colores de ensayo no cuentan":"Quedan "+Math.max(0,mc.shots-sh)+" disparos";
+  drawShots();
+  if(M.phase==="main"){const rem=mc.shots-sh;
+    if(rem<=0){$("mPace").textContent="Tirada completa. Sobran "+mmss(left);}
+    else{const per=left/rem,ideal=sh*(M.dur/mc.shots),diff=ideal-el;
+      $("mPace").textContent=mmss(per)+" por disparo restante · "+(Math.abs(diff)<20?"en ritmo":diff>0?mmss(diff)+" de margen":mmss(-diff)+" de retraso");}}}
+
+/* ---------------- breathing ---------------- */
+let B=null;
+function startBreath(){audio();wake(true);B={start:performance.now(),ph:"",t:setInterval(bTick,100)};$("bStart").disabled=true;$("bStop").disabled=false;}
+function bTick(){if(!B)return;const el=(performance.now()-B.start)/1000,left=180-el,c=el%10,ph=c<4?"in":"out",d=$("bDial");
+  if(left<=0){S.end();stopBreath();$("bPh").textContent="Hecho";return;}
+  if(ph!==B.ph){B.ph=ph;S.soft(ph==="in"?440:330);d.style.transitionDuration=(ph==="in"?4:6)+"s";d.style.transform=ph==="in"?"scale(1.08)":"scale(.86)";d.className="dial "+(ph==="in"?"hold":"rest");}
+  $("bPh").textContent=ph==="in"?"Inspira":"Espira";$("bNum").textContent=mmss(left);}
+function stopBreath(){if(B){clearInterval(B.t);B=null;}wake(false);const d=$("bDial");d.style.transform="";d.className="dial";$("bStart").disabled=false;$("bStop").disabled=true;$("bPh").textContent="Listo";$("bNum").textContent="3:00";}
+function stopAll(){if(T){clearInterval(T.t);T=null;}if(M){clearInterval(M.t);M=null;}if(SQ){clearInterval(SQ.t);SQ=null;}if(B)stopBreath();wake(false);}
+
+/* ---------------- guide ---------------- */
+const G=[
+ ["Parada","",[
+  ["Punto natural","Coloca la posición, levanta con ojos cerrados, abre y mira dónde apuntan las miras. Corrige con los pies, nunca con el brazo.","5–8 al inicio"],
+  ["Pared blanca","Levanta y para 10–12 s mirando solo la alineación de miras. Sin apretar el disparador.","20–30 levantadas","hold",{reps:20,hold:12,name:"Pared blanca"}],
+  ["Parada larga","Mantén la parada más tiempo que en un disparo real, de 20 s hasta 40 s.","6–10 levantadas","hold",{reps:8,hold:20,rest:40,name:"Parada larga"}],
+  ["Sobrecarga","Pistola con 100–200 g añadidos, 15 s de parada. Termina con 5 levantadas sin peso.","6–8 levantadas","hold",{reps:8,hold:15,rest:40,name:"Sobrecarga"}],
+  ["Zona de puntería","Parada sobre banda horizontal y después sobre diana, con las miras en tu zona bajo el negro.","15–20 levantadas","hold",{reps:15,hold:12,name:"Zona de puntería"}],
+  ["Línea","Recorre despacio una línea vertical y otra horizontal de 30 cm sin perder la alineación.","5 por línea"],
+  ["Equilibrio","Parada con pies juntos o sobre base inestable; después vuelve a tu posición normal.","6–8 levantadas","hold",{reps:8,hold:12,name:"Equilibrio"}]]],
+ ["Intuición y suelta","",[
+  ["Suelta en pared blanca","En seco y sin diana: primera fase al bajar y presión sin pausas hasta que rompa. Las miras no se mueven al romper.","30 sueltas","win",{reps:30,name:"Suelta en pared blanca"}],
+  ["Disparador puro","Brazo apoyado en la mesa; sueltas en seco atendiendo solo al dedo.","20–30 sueltas"],
+  ["Blanco vuelto","Tiro real contra el reverso de la diana. Se valora el tamaño del grupo.","20–30 disparos","win",{reps:20,name:"Blanco vuelto"}],
+  ["Ojos cerrados","Apunta, cierra los ojos y suelta. Siente solo el recorrido del disparador.","10 disparos","win",{reps:10,name:"Ojos cerrados"}],
+  ["Anuncio","Antes de mirar el impacto, di valor y hora («9 a las 4») y márcalo en Acertado o Fallado.","Todos los disparos"],
+  ["3 + 1","Tres sueltas en seco y un disparo real con la misma sensación.","6–10 ciclos"],
+  ["Ventana de tiempo","El disparo sale entre 4 y 8 s tras entrar en zona.","20 disparos","win",{reps:20}],
+  ["Presión continua","Consigna única: «o sale o bajo». Prohibido detener el dedo y reanudar.","2 series de 10","win",{reps:10}]]],
+ ["Decisión y presión","",[
+  ["Regla de los 8 s","Si a los 8 s de entrar en zona no ha salido el disparo, se baja siempre.","Toda sesión","win",{reps:20}],
+  ["Abortos obligados","Antes de cada levantada el timer decide: una de cada tres se baja sin disparar aunque la imagen sea buena.","3 series de 10","dice"],
+  ["Semáforo","Tras cada disparo: verde, amarillo o rojo. Objetivo: cero rojos.","30–40 disparos"],
+  ["Solo dieces","Solo se dispara con imagen y parada perfectas. Se cuentan los abortos.","Máx. 20 en 40 min","win",{reps:30}],
+  ["Señal externa","Tono grave al azar durante la puntería: si suena, se baja.","20 levantadas","signal"],
+  ["Reinicio tras fallo","Tras un 8 o peor: bajar, dos respiraciones largas, una suelta en seco y rutina completa.","Siempre"],
+  ["Diez seguidos","10 disparos seguidos de 9 o más; si entra uno peor, el contador vuelve a cero.","Límite 30 min"],
+  ["Disparo único","Un solo disparo a la orden con tiempo limitado y 2 min de espera.","10 disparos","single"]]],
+ ["Físico A · hombro y antebrazo","g-fisA",[
+  ["Bloque A completo","Los cinco ejercicios seguidos, con descansos y cambios de brazo.","≈"+seqMin(block(BLOCKA,false))+" min","seq",{id:"blockA"}],
+  ["Bloque A · 2 series","Versión corta para la fase 3 o los días justos de tiempo.","≈"+seqMin(block(BLOCKA,true))+" min","seq",{id:"blockA",short:true}],
+  ["Elevación frontal isométrica",EX.frontal.d+".","4 × 35 s por brazo","seq",{id:"frontal"}],
+  ["Rotación externa con goma",EX.rotext.d+".","3 × 15 por brazo","seq",{id:"rotext"}],
+  ["Elevaciones laterales",EX.lat.d+".","3 × 12","seq",{id:"lat"}],
+  ["Flexión y extensión de muñeca",EX.muneca.d+".","3 × 15 por brazo","seq",{id:"muneca"}],
+  ["Estiramientos de brazo","Hombro, antebrazo y pectoral, 30 s cada uno, sin rebotes.","3 min","seq",{id:"estirA"}]]],
+ ["Físico B · tronco y equilibrio","g-fisB",[
+  ["Bloque B completo","Los seis ejercicios seguidos, con descansos y cambios de lado.","≈"+seqMin(block(BLOCKB,false))+" min","seq",{id:"blockB"}],
+  ["Bloque B · 2 series","Versión corta para la fase 3 o los días justos de tiempo.","≈"+seqMin(block(BLOCKB,true))+" min","seq",{id:"blockB",short:true}],
+  ["Plancha frontal",EX.plank.d+".","3 × 40 s","seq",{id:"plank"}],
+  ["Plancha lateral",EX.side.d+".","3 × 30 s por lado","seq",{id:"side"}],
+  ["Bird-dog",EX.bird.d+".","3 × 10 por lado","seq",{id:"bird"}],
+  ["Puente de glúteo",EX.puente.d+".","3 × 15","seq",{id:"puente"}],
+  ["Equilibrio a una pierna",EX.bal.d+".","3 × 30 s por pierna","seq",{id:"bal"}],
+  ["Estiramiento lumbar y de cadera","Rodillas al pecho, flexor de cadera y torsión tumbado.","3 min","seq",{id:"lumbar"}]]],
+ ["Movilidad por zonas","g-mov",[
+  ["Movilidad corta","Tobillos, rodillas, cadera (movimiento, giro y torsión de tronco), muñecas, codos, hombros y cuello.","3 min","seq",{id:"movShort"}],
+  ["Movilidad de competición","Las mismas zonas con más tiempo, empezando por caminar.","8 min","seq",{id:"movComp"}]]],
+ ["Calentamiento corto · 10 min","g-calenta",[
+  ["Calentamiento completo","Movilidad por zonas, activación, respiración, punto natural y seco, todo seguido.","10 min","seq",{id:"calShort"}],
+  ["Activación","Rotadores con goma y brazo de tiro extendido.","2 min","seq",{id:"actShort"}],
+  ["Respiración 4–6","4 s dentro, 6 s fuera.","3 min","breath"]]],
+ ["Calentamiento de competición","g-comp",[
+  ["2 h antes","Comida ligera y conocida, la cafeína de siempre, agua a sorbos.",""],
+  ["60–90 min antes","Llegar, control de equipo, localizar el puesto, comprobar cilindro y balines.",""],
+  ["De −45 a −20 min","Movilidad 8 min, activación 5 min, respiración 3 min, visualización 2 min y 7 min para colocarte en el puesto.","25 min","seq",{id:"calComp"}],
+  ["Activación sola","Rotadores, brazo extendido, plancha y equilibrio.","5 min","seq",{id:"actComp"}],
+  ["Preparación y tirada","15 min de preparación y ensayo + 60 disparos en 75 min. Corrige miras por grupo de 3–5, nunca por uno.","90 min","full"]]]
+];
+function renderGuia(){let h="";G.forEach(g=>{h+='<h2'+(g[1]?' id="'+g[1]+'"':'')+'>'+esc(g[0])+'</h2><div class="card">';
+  g[2].forEach(e=>{h+='<div class="item"><div class="tx"><div class="row between"><b>'+esc(e[0])+'</b>'+(e[2]?'<span class="pill">'+esc(e[2])+'</span>':'')+'</div><p class="mute">'+esc(e[1])+'</p></div>'+
+    (e[3]?'<button class="sm" data-preset="'+e[3]+'" data-o="'+esc(JSON.stringify(e[4]||{}))+'">Timer</button>':'')+'</div>';});h+='</div>';});
+  $("guia").innerHTML=h;}
+
+/* ---------------- session form ---------------- */
+const TYPES=["Test","Parada","Suelta e intuición","Decisión","Series a ritmo","Control","Simulacro","Tiro de calidad","Calentamiento y físico","Competición","Otro"];
+$("fSes").innerHTML=TYPES.map(t=>"<option>"+t+"</option>").join("");
+const FIELDS=["fFecha","fLugar","fDur","fSes","fFis","fLev","fDisp","fSen","f10a0","f100","fT","fL","fDA","fS1","fS2","fS3","fS4","fS5","fS6","fV","fA","fR","fX","fAnn","fOk","fNotas"];
+const PADF={fV:"v",fA:"a",fR:"r",fX:"x",fOk:"ok"};
+function typeFor(title){const t=title||"";
+  if(/COMPETICIÓN/.test(t))return"Competición";if(/SIMULACRO/.test(t))return"Simulacro";if(/CONTROL/.test(t))return"Control";
+  if(/Test/.test(t))return"Test";if(/Parada/.test(t))return"Parada";if(/[Ss]uelta|intuición/.test(t))return"Suelta e intuición";
+  if(/Decisión|presión|dieces/.test(t))return"Decisión";if(/[Ss]eries/.test(t))return"Series a ritmo";if(/físico/.test(t))return"Calentamiento y físico";
+  if(/calidad|Último|Rutina/.test(t))return"Tiro de calidad";return"Otro";}
+function prefill(force){const d=store.draft;
+  FIELDS.forEach(f=>{if(d[f]!=null)$(f).value=d[f];});
+  if(force||!d.fFecha){const p=todayPos(),s=W[p.w]&&W[p.w][p.d];$("fFecha").value=isoToday();
+    if(s){$("fLugar").value=s[0]==="Competición"?"Competición":s[0];$("fSes").value=typeFor(s[1]);const m=s[1].match(/Físico ([AB])/);$("fFis").value=m?m[1]:"No";}
+    if(!$("fDur").value)$("fDur").value=60;saveDraft();}}
+function saveDraft(){FIELDS.forEach(f=>{store.draft[f]=$(f).value;});save();}
+function syncForm(c){c=c||counts();Object.keys(PADF).forEach(f=>{if(!store.draft["t_"+f])$(f).value=c[PADF[f]]||"";});
+  if(!store.draft.t_fAnn)$("fAnn").value=(c.ok+c.ko)||"";
+  serTot();}
+const nv=id=>{const v=$(id).value;if(v===""||v==null)return null;const n=parseFloat(String(v).replace(",","."));return isNaN(n)?null:n;};
+function serTot(){const s=[1,2,3,4,5,6].map(i=>nv("fS"+i)).filter(x=>x!=null);
+  $("fSerTot").textContent=s.length?"Total "+s.reduce((a,b)=>a+b,0).toFixed(1)+" en "+s.length*10+" disparos · media "+(s.reduce((a,b)=>a+b,0)/s.length).toFixed(1)+" por serie":"Opcional. Si las rellenas, el total y los disparos puntuados se calculan solos.";}
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+function saveSession(){const fecha=$("fFecha").value;if(!parseIso(fecha)){$("saveMsg").textContent="Pon una fecha válida.";return;}
+  const c=counts(),ser=[1,2,3,4,5,6].map(i=>nv("fS"+i));const sv=ser.filter(x=>x!=null);
+  const p=posOf(parseIso(fecha));
+  const s={id:uid(),fecha,semana:p.w,fase:phaseOf(p.w),lugar:$("fLugar").value,ses:$("fSes").value,dur:nv("fDur"),lev:nv("fLev"),
+    disp:nv("fDisp")!=null?nv("fDisp"):(c.shots||null),a10:nv("f10a0"),a100:nv("f100"),L:nv("fL"),DA:nv("fDA"),T:nv("fT"),
+    pts:sv.length?+sv.reduce((a,b)=>a+b,0).toFixed(1):null,pp:sv.length?sv.length*10:null,ser,
+    v:nv("fV"),a:nv("fA"),r:nv("fR"),x:nv("fX"),ann:nv("fAnn"),ok:nv("fOk"),fis:$("fFis").value,sen:nv("fSen"),notas:$("fNotas").value.trim()};
+  const has=["dur","lev","disp","a10","L","DA","T","pts","v","a","r","x"].some(k=>s[k]!=null)||s.notas;
+  if(!has){$("saveMsg").textContent="La sesión está vacía: marca disparos o rellena algún dato.";return;}
+  store.sessions.push(s);store.log=[];store.acts=[];store.draft={};save();
+  FIELDS.forEach(f=>{$(f).value="";});prefill(true);renderPads();renderHist();
+  $("saveMsg").textContent="Guardada. Ahora pulsa «Guardar Excel» para actualizar el fichero del móvil.";}
+
+/* ---------------- stats ---------------- */
+const derive=s=>{const n=(s.v||0)+(s.a||0)+(s.r||0);return{
+  ms:s.pts!=null&&s.pp?s.pts/s.pp*10:null,r10:n?(s.r||0)/n*10:null,x10:n&&s.x!=null?s.x/n*10:null,an:s.ann?(s.ok||0)/s.ann*100:null};};
+const sorted=()=>store.sessions.slice().sort((a,b)=>a.fecha<b.fecha?-1:a.fecha>b.fecha?1:0);
+const METRICS=[["Parada · 10a0 (%)",s=>s.a10,1,1],["Apuntado · 10.0 (%)",s=>s.a100,1,1],["Traza · L (mm)",s=>s.L,-1,1],["Suelta · DA (mm)",s=>s.DA,-1,1],
+  ["T. puntería (s)",s=>s.T,0,1],["Media por serie",s=>derive(s).ms,1,1],["Rojos por 10",s=>derive(s).r10,-1,1],["Anuncio (%)",s=>derive(s).an,1,0],["Sensación",s=>s.sen,1,1]];
+function renderEv(){const ss=sorted();let h='<tr><th>Métrica</th><th class="n">Primera</th><th class="n">Última</th><th class="n">Media 3 últ.</th><th class="n">Cambio</th></tr>',any=false;
+  METRICS.forEach(m=>{const vals=ss.map(m[1]).filter(v=>v!=null&&!isNaN(v));if(!vals.length)return;any=true;
+    const f=vals[0],l=vals[vals.length-1],l3=vals.slice(-3),avg=l3.reduce((a,b)=>a+b,0)/l3.length,ch=l-f,dec=m[3];
+    const cls=vals.length<2||!m[2]||ch===0?"":ch*m[2]>0?"up":"dn";
+    h+='<tr><td>'+m[0]+'</td><td class="n">'+f.toFixed(dec)+'</td><td class="n">'+l.toFixed(dec)+'</td><td class="n">'+avg.toFixed(dec)+'</td><td class="n '+cls+'">'+(vals.length<2?"–":(ch>0?"+":"")+ch.toFixed(dec))+'</td></tr>';});
+  $("evTable").innerHTML=any?h:'<tr><td class="mute">Aún no hay sesiones con datos.</td></tr>';}
+let delArm=null;
+function renderHist(){const ss=sorted().reverse();$("nSess").textContent=ss.length+(ss.length===1?" sesión":" sesiones");
+  $("histList").innerHTML=ss.length?ss.slice(0,15).map(s=>{const d=derive(s),bits=[];
+    if(s.a10!=null)bits.push("10a0 "+s.a10);if(s.L!=null)bits.push("L "+s.L);if(d.ms!=null)bits.push("media "+d.ms.toFixed(1));
+    if(d.r10!=null)bits.push("rojos/10 "+d.r10.toFixed(1));if(s.disp!=null)bits.push(s.disp+" disp.");
+    const p=parseIso(s.fecha);
+    return '<div class="hist"><div><b>'+fd(p)+' · '+esc(s.ses)+'</b><br><span class="mute">'+esc(s.lugar)+(bits.length?" · "+bits.join(" · "):"")+'</span></div><button class="sm ghost" data-del="'+s.id+'">'+(delArm===s.id?"¿Borrar?":"Borrar")+'</button></div>';}).join("")+
+    (ss.length>15?'<p class="mute">Se muestran las 15 más recientes; el Excel lleva todas.</p>':""):'<p class="mute">Todavía no has guardado ninguna sesión.</p>';
+  renderEv();}
+
+/* ---------------- Excel ---------------- */
+const XFILE="PracticaTiro_Pistola10m.xlsx";
+const HS=["Fecha","Semana","Fase","Lugar","Sesión","Duración (min)","Levantadas en seco","Disparos","10a0 (%)","10.0 (%)","L (mm)","DA (mm)","T. puntería (s)","Puntos totales","Disparos puntuados","Media por serie de 10","Verdes","Amarillos","Rojos","Abortos","Rojos por 10","Abortos por 10","Disparos anunciados","Anuncios acertados","Anuncio (%)","Físico","Sensación (1–5)","Notas","ID"];
+const HC=["Fecha","Tipo","Serie 1","Serie 2","Serie 3","Serie 4","Serie 5","Serie 6","Total","Media por serie","Mejor serie","Peor serie","Diferencia","Notas","ID"];
+const serial=iso=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);return Date.UTC(+m[1],+m[2]-1,+m[3])/864e5+25569;};
+const fromSerial=n=>{const d=new Date(Math.round((n-25569)*864e5));return d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,"0")+"-"+String(d.getUTCDate()).padStart(2,"0");};
+function buildWB(){const X=window.XLSX,wb=X.utils.book_new(),ss=sorted();
+  const rows=ss.map(s=>[null,s.semana,s.fase,s.lugar,s.ses,s.dur,s.lev,s.disp,s.a10,s.a100,s.L,s.DA,s.T,s.pts,s.pp,null,s.v,s.a,s.r,s.x,null,null,s.ann,s.ok,null,s.fis,s.sen,s.notas||null,s.id]);
+  const ws=X.utils.aoa_to_sheet([HS,...rows]);
+  ss.forEach((s,i)=>{const r=i+2;
+    ws["A"+r]={t:"n",v:serial(s.fecha),z:"dd/mm/yyyy"};
+    ws["P"+r]={t:"n",f:'IF(AND(ISNUMBER(N'+r+'),N(O'+r+')>0),N'+r+'/O'+r+'*10,"")',z:"0.0"};
+    ws["U"+r]={t:"n",f:'IF(SUM(Q'+r+':S'+r+')>0,S'+r+'/SUM(Q'+r+':S'+r+')*10,"")',z:"0.0"};
+    ws["V"+r]={t:"n",f:'IF(AND(SUM(Q'+r+':S'+r+')>0,ISNUMBER(T'+r+')),T'+r+'/SUM(Q'+r+':S'+r+')*10,"")',z:"0.0"};
+    ws["Y"+r]={t:"n",f:'IF(AND(N(W'+r+')>0,ISNUMBER(X'+r+')),X'+r+'/W'+r+'*100,"")',z:"0"};});
+  ws["!ref"]="A1:AC"+Math.max(2,ss.length+1);
+  ws["!cols"]=[11,7,5,10,18,9,10,8,8,8,8,8,9,9,9,10,7,9,6,8,8,8,10,10,9,9,9,40,10].map(w=>({wch:w}));
+  X.utils.book_append_sheet(wb,ws,"Sesiones");
+  // Semanal
+  const R=c=>"Sesiones!$"+c+"$2:$"+c+"$2000",HW=["Semana","Inicio","Fase","Sesiones","Minutos","Disparos","10a0 (%)","10.0 (%)","L (mm)","DA (mm)","T. puntería (s)","Media por serie","Rojos por 10","Abortos por 10","Anuncio (%)","Sensación"];
+  const sw=X.utils.aoa_to_sheet([HW]);
+  for(let w=0;w<=13;w++){const r=w+2,A="$A"+r,wd=w===0?Date.UTC(2026,10,11):Date.UTC(2026,10,16+(w-1)*7),cond=R("B")+","+A;
+    sw["A"+r]={t:"n",v:w};sw["B"+r]={t:"n",v:wd/864e5+25569,z:"dd/mm/yyyy"};sw["C"+r]={t:"n",v:phaseOf(w)};
+    sw["D"+r]={t:"n",f:"COUNTIF("+R("B")+","+A+")"};sw["E"+r]={t:"n",f:"SUMIFS("+R("F")+","+cond+")"};sw["F"+r]={t:"n",f:"SUMIFS("+R("H")+","+cond+")"};
+    [["G","I"],["H","J"],["I","K"],["J","L"],["K","M"],["P","AA"]].forEach(([dst,src])=>{sw[dst+r]={t:"n",f:'IFERROR(AVERAGEIFS('+R(src)+','+cond+'),"")',z:"0.0"};});
+    const qrs="(SUMIFS("+R("Q")+","+cond+")+SUMIFS("+R("R")+","+cond+")+SUMIFS("+R("S")+","+cond+"))";
+    sw["L"+r]={t:"n",f:'IFERROR(SUMIFS('+R("N")+','+cond+')/SUMIFS('+R("O")+','+cond+')*10,"")',z:"0.0"};
+    sw["M"+r]={t:"n",f:'IFERROR(SUMIFS('+R("S")+','+cond+')/'+qrs+'*10,"")',z:"0.0"};
+    sw["N"+r]={t:"n",f:'IFERROR(SUMIFS('+R("T")+','+cond+')/'+qrs+'*10,"")',z:"0.0"};
+    sw["O"+r]={t:"n",f:'IFERROR(SUMIFS('+R("X")+','+cond+')/SUMIFS('+R("W")+','+cond+')*100,"")',z:"0"};}
+  sw["!ref"]="A1:P15";sw["!cols"]=HW.map((h,i)=>({wch:i===1?11:Math.max(8,h.length+1)}));
+  X.utils.book_append_sheet(wb,sw,"Semanal");
+  // Controles
+  const cs=ss.filter(s=>s.ser&&s.ser.some(x=>x!=null));
+  const cw=X.utils.aoa_to_sheet([HC,...cs.map(s=>[null,s.ses,...s.ser.map(x=>x==null?null:x),null,null,null,null,null,s.notas||null,s.id])]);
+  cs.forEach((s,i)=>{const r=i+2,rg="C"+r+":H"+r,e='IF(COUNT('+rg+')=0,"",';
+    cw["A"+r]={t:"n",v:serial(s.fecha),z:"dd/mm/yyyy"};
+    cw["I"+r]={t:"n",f:e+"SUM("+rg+"))",z:"0.0"};cw["J"+r]={t:"n",f:e+"AVERAGE("+rg+"))",z:"0.0"};
+    cw["K"+r]={t:"n",f:e+"MAX("+rg+"))",z:"0.0"};cw["L"+r]={t:"n",f:e+"MIN("+rg+"))",z:"0.0"};cw["M"+r]={t:"n",f:e+"K"+r+"-L"+r+")",z:"0.0"};});
+  cw["!ref"]="A1:O"+Math.max(2,cs.length+1);cw["!cols"]=[11,16,8,8,8,8,8,8,8,10,9,9,10,40,10].map(w=>({wch:w}));
+  X.utils.book_append_sheet(wb,cw,"Controles");
+  // Resumen
+  const RM=[["Parada · 10a0 (%)","I",1],["Apuntado · 10.0 (%)","J",1],["Traza · L (mm)","K",-1],["Suelta · DA (mm)","L",-1],["Tiempo de puntería (s)","M",0],
+    ["Media por serie de 10","P",1],["Rojos por 10 disparos","U",-1],["Abortos por 10 disparos","V",0],["Anuncio (%)","Y",1],["Sensación (1–5)","AA",1]];
+  const rs=X.utils.aoa_to_sheet([["Métrica","Sesiones con dato","Primera","Última","Media","Mejor","Cambio","Referencia"]]);
+  const REF=["Sube mes a mes","Sube mes a mes","Baja mes a mes","Baja mes a mes","Entre 4 y 8 s, regular","Por encima del test inicial","0–1","1–3; cero suele ser forzar","80 % o más","Estable o subiendo"];
+  RM.forEach((m,i)=>{const r=i+2,rg="Sesiones!"+m[1]+"2:"+m[1]+"2000",b="B"+r;
+    rs["A"+r]={t:"s",v:m[0]};rs[b]={t:"n",f:"COUNT("+rg+")"};
+    rs["C"+r]={t:"n",f:'IF('+b+'=0,"",INDEX('+rg+',MATCH(TRUE,INDEX(ISNUMBER('+rg+'),0),0)))',z:"0.0"};
+    rs["D"+r]={t:"n",f:'IF('+b+'=0,"",LOOKUP(2,1/ISNUMBER('+rg+'),'+rg+'))',z:"0.0"};
+    rs["E"+r]={t:"n",f:'IF('+b+'=0,"",AVERAGE('+rg+'))',z:"0.0"};
+    rs["F"+r]=m[2]===0?{t:"s",v:"–"}:{t:"n",f:'IF('+b+'=0,"",'+(m[2]<0?"MIN":"MAX")+'('+rg+'))',z:"0.0"};
+    rs["G"+r]={t:"n",f:'IF('+b+'<2,"",D'+r+'-C'+r+')',z:"+0.0;-0.0;0.0"};rs["H"+r]={t:"s",v:REF[i]};});
+  const tot=[["Sesiones registradas","COUNT(Sesiones!A2:A2000)","0"],["Horas de entrenamiento","SUM(Sesiones!F2:F2000)/60","0.0"],["Disparos","SUM(Sesiones!H2:H2000)","0"],
+    ["Levantadas en seco","SUM(Sesiones!G2:G2000)","0"],["Controles y simulacros con series","COUNT(Controles!I2:I2000)","0"],["Mejor media por serie en control",'IF(COUNT(Controles!J2:J2000)=0,"",MAX(Controles!J2:J2000))',"0.0"]];
+  tot.forEach((t,i)=>{const r=14+i;rs["A"+r]={t:"s",v:t[0]};rs["B"+r]={t:"n",f:t[1],z:t[2]};});
+  rs["A13"]={t:"s",v:"Volumen acumulado"};
+  rs["A21"]={t:"s",v:"Generado por la app el "+new Date().toLocaleDateString("es-ES")+". Semana 1 = lunes 16/11/2026. Objetivo: 13–14/02/2027."};
+  rs["!ref"]="A1:H21";rs["!cols"]=[{wch:30},{wch:14},{wch:9},{wch:9},{wch:9},{wch:9},{wch:9},{wch:28}];
+  X.utils.book_append_sheet(wb,rs,"Resumen");
+  wb.SheetNames=["Resumen","Sesiones","Semanal","Controles"];
+  return X.write(wb,{bookType:"xlsx",type:"array"});}
+let DL;const getDL=()=>{if(DL===undefined)DL=(window.claude&&typeof window.claude.use==="function")?window.claude.use("downloads").catch(()=>null):Promise.resolve(null);return DL;};
+async function saveExcel(){const msg=$("xlsMsg");
+  if(!window.XLSX){msg.textContent="No se pudo cargar el generador de Excel. Comprueba la conexión y recarga la app.";return;}
+  if(!store.sessions.length){msg.textContent="Guarda al menos una sesión antes de generar el Excel.";return;}
+  let data;try{data=buildWB();}catch(e){msg.textContent="Error al generar el Excel: "+e.message;return;}
+  const dl=await getDL();
+  if(!dl){try{const url=URL.createObjectURL(new Blob([data],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
+      const a=document.createElement("a");a.href=url;a.download=XFILE;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
+      msg.innerHTML="Descargado <b>"+XFILE+"</b>. Muévelo a <b>Documentos/PracticaTiro</b> si no lo guardaste allí.";}
+    catch(e){msg.textContent="No se pudo descargar el Excel. Usa «Copiar las sesiones».";}return;}
+  try{await dl.save({filename:XFILE,data:new Blob([data])});
+    msg.innerHTML="Listo. Guárdalo en <b>Documentos/PracticaTiro</b> como <b>"+XFILE+"</b> y sustituye el anterior.";}
+  catch(e){const c=e&&e.code;msg.textContent=c==="declined"?"Guardado cancelado.":c==="rate_limited"?"Ya hay un aviso de guardado abierto; espera un momento.":"No se pudo guardar el Excel ("+(c||"error")+").";}}
+function importExcel(file){const msg=$("xlsMsg");if(!file)return;
+  if(!window.XLSX){msg.textContent="No se pudo cargar el lector de Excel. Comprueba la conexión.";return;}
+  const rd=new FileReader();rd.onerror=()=>{msg.textContent="No se pudo leer el fichero.";};
+  rd.onload=()=>{try{const X=window.XLSX,wb=X.read(new Uint8Array(rd.result),{type:"array"});
+    const sh=wb.Sheets["Sesiones"];if(!sh){msg.textContent="Ese fichero no tiene la hoja «Sesiones». Elige el Excel que guardó esta app.";return;}
+    const rows=X.utils.sheet_to_json(sh,{defval:null,raw:true});
+    const ctrl={};if(wb.Sheets["Controles"])X.utils.sheet_to_json(wb.Sheets["Controles"],{defval:null,raw:true}).forEach(r=>{if(r.ID)ctrl[r.ID]=[1,2,3,4,5,6].map(i=>num2(r["Serie "+i]));});
+    const have=new Set(store.sessions.map(s=>s.id));let add=0,dup=0;
+    rows.forEach(r=>{let f=r["Fecha"];if(typeof f==="number")f=fromSerial(f);else if(typeof f==="string"){const m=/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(f.trim());f=m?(m[3].length===2?"20"+m[3]:m[3])+"-"+m[2].padStart(2,"0")+"-"+m[1].padStart(2,"0"):null;}
+      if(!parseIso(f))return;const id=r["ID"]||("x"+f+(r["Sesión"]||""));if(have.has(id)){dup++;return;}
+      const p=posOf(parseIso(f));
+      store.sessions.push({id,fecha:f,semana:p.w,fase:phaseOf(p.w),lugar:r["Lugar"]||"",ses:r["Sesión"]||"Otro",dur:num2(r["Duración (min)"]),lev:num2(r["Levantadas en seco"]),
+        disp:num2(r["Disparos"]),a10:num2(r["10a0 (%)"]),a100:num2(r["10.0 (%)"]),L:num2(r["L (mm)"]),DA:num2(r["DA (mm)"]),T:num2(r["T. puntería (s)"]),
+        pts:num2(r["Puntos totales"]),pp:num2(r["Disparos puntuados"]),ser:ctrl[id]||[null,null,null,null,null,null],
+        v:num2(r["Verdes"]),a:num2(r["Amarillos"]),r:num2(r["Rojos"]),x:num2(r["Abortos"]),ann:num2(r["Disparos anunciados"]),ok:num2(r["Anuncios acertados"]),
+        fis:r["Físico"]||"No",sen:num2(r["Sensación (1–5)"]),notas:r["Notas"]||""});have.add(id);add++;});
+    save();renderHist();msg.textContent="Excel abierto: "+add+" sesiones nuevas añadidas"+(dup?", "+dup+" ya estaban":"")+".";}
+   catch(e){msg.textContent="No se pudo leer el Excel: "+e.message;}};
+  rd.readAsArrayBuffer(file);}
+const num2=v=>{if(v==null||v==="")return null;const n=typeof v==="number"?v:parseFloat(String(v).replace(",","."));return isNaN(n)?null:n;};
+function copyTSV(){const ss=sorted(),c=v=>v==null?"":String(v).replace(/[\t\n]/g," ");
+  const lines=[HS.filter(h=>h!=="ID").join("\t"),...ss.map(s=>{const d=derive(s),p=parseIso(s.fecha);
+    return [p.getDate()+"/"+(p.getMonth()+1)+"/"+p.getFullYear(),s.semana,s.fase,s.lugar,s.ses,s.dur,s.lev,s.disp,s.a10,s.a100,s.L,s.DA,s.T,s.pts,s.pp,
+      d.ms==null?"":d.ms.toFixed(1),s.v,s.a,s.r,s.x,d.r10==null?"":d.r10.toFixed(1),d.x10==null?"":d.x10.toFixed(1),s.ann,s.ok,d.an==null?"":Math.round(d.an),s.fis,s.sen,s.notas].map(c).join("\t");})];
+  const txt=lines.join("\n"),m=$("xlsMsg");
+  try{navigator.clipboard.writeText(txt).then(()=>{m.textContent="Copiadas "+ss.length+" sesiones. Pégalas en la hoja Sesiones de tu Excel.";},()=>{m.textContent="El navegador no deja copiar aquí.";});}catch(e){m.textContent="El navegador no deja copiar aquí.";}}
+
+/* ---------------- navigation and events ---------------- */
+function go(tab,anchor){store.tab=tab;save();
+  document.querySelectorAll(".view").forEach(v=>v.classList.toggle("on",v.id==="v-"+tab));
+  document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.tab===tab));
+  const m=$("main");if(anchor&&$(anchor))$(anchor).scrollIntoView();else m.scrollTop=0;}
+function presetButtons(id,list){$(id).innerHTML=list.map(([k,o,name,desc])=>{
+  const p=k==="seq"?getSeq(o.id,o.short):(PRE[k]||MP[k]||{name:"Respiración 4–6",desc:"3 min: 4 s dentro, 6 s fuera"});
+  return '<button data-preset="'+k+'" data-o="'+esc(JSON.stringify(o||{}))+'">'+esc(name||p.name)+'<small>'+esc(desc||(k==="seq"?seqMin(p.steps)+" min":p.desc))+'</small></button>';}).join("");}
+document.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+  if(b.dataset.tab){go(b.dataset.tab);return;}
+  if(b.dataset.go){go(b.dataset.go,b.dataset.anchor);return;}
+  if(b.dataset.preset){let o={};try{o=JSON.parse(b.dataset.o||"{}");}catch(_){}
+    audio();loadPreset(b.dataset.preset,o);go("timers");return;}
+  if(b.dataset.day){selD=+b.dataset.day;renderHoy();return;}
+  if(b.dataset.shot){logShot(b.dataset.shot);return;}
+  if(b.dataset.an!=null){logAn(+b.dataset.an);return;}
+  if(b.hasAttribute("data-undo")){undo();return;}
+  if(b.dataset.del){if(delArm===b.dataset.del){store.sessions=store.sessions.filter(s=>s.id!==b.dataset.del);delArm=null;save();}else delArm=b.dataset.del;renderHist();return;}
+  switch(b.id){
+    case"wkPrev":selW--;selD=0;while(!W[selW][selD])selD++;renderHoy();break;
+    case"wkNext":selW++;selD=0;renderHoy();break;
+    case"toSession":if(!store.draft.fFecha)prefill(true);go("sesion");break;
+    case"tStart":startInterval();break;case"tPause":pauseInterval();break;
+    case"tStop":stopAll();drawIdle();break;
+    case"sStart":startSeq();break;case"sPause":pauseSeq();break;case"sSkip":if(SQ&&!SQ.paused)sStep(SQ.i+1);break;
+    case"sStop":stopAll();drawSeqIdle();break;
+    case"mStart":startMatch();break;case"mStop":stopAll();drawMatchIdle();break;
+    case"mNext":if(M&&M.phase==="prep")mPhase("main");break;
+    case"bStart":startBreath();break;case"bStop":stopBreath();break;
+    case"testSnd":audio();S.up();setTimeout(S.down,700);break;
+    case"saveSess":saveSession();break;
+    case"xlsSave":saveExcel();break;
+    case"xlsOpenBtn":$("xlsOpen").value="";$("xlsOpen").click();break;
+    case"xlsCopy":copyTSV();break;}
+});
+document.addEventListener("change",e=>{const t=e.target,k=t.dataset&&t.dataset.k;
+  if(k){if(t.checked)store.done[k]=1;else delete store.done[k];save();renderHoy();return;}
+  if(t.id==="xlsOpen"){importExcel(t.files&&t.files[0]);return;}
+  if(t.id==="cReps"&&!T)drawIdle();
+  if(FIELDS.includes(t.id))saveDraft();});
+document.addEventListener("input",e=>{const id=e.target.id;if(!FIELDS.includes(id))return;
+  if(PADF[id]||id==="fAnn")store.draft["t_"+id]=1;if(/^fS\d$/.test(id))serTot();saveDraft();});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&(T||M||B||SQ))wake(true);});
+
+presetButtons("pTiro",[["hold",{}],["win",{}],["signal",{}],["dice",{}],["single",{}]]);
+presetButtons("pMatch",[["full",{}],["half",{}],["control",{}]]);
+presetButtons("pCal",[["seq",{id:"calShort"},"Calentamiento de sesión"],["seq",{id:"calComp"},"Calentamiento de competición"],
+  ["seq",{id:"movShort"},"Movilidad por zonas","3 min · 9 zonas"],["seq",{id:"movComp"},"Movilidad larga","8 min · 10 zonas"],
+  ["seq",{id:"actShort"},"Activación"],["breath",{}]]);
+presetButtons("pFis",[["seq",{id:"blockA"},"Bloque A completo"],["seq",{id:"blockA",short:true},"Bloque A · 2 series"],
+  ["seq",{id:"blockB"},"Bloque B completo"],["seq",{id:"blockB",short:true},"Bloque B · 2 series"]]);
+if(!W[selW][selD]){selD=0;while(!W[selW][selD])selD++;}
+renderHoy();renderGuia();prefill(false);renderPads();renderHist();loadPreset("win");
+const TABS=["hoy","timers","guia","rutina","sesion"],hashTab=(location.hash||"").slice(1);
+go(TABS.includes(hashTab)?hashTab:TABS.includes(store.tab)?store.tab:"hoy");
+if(hashTab==="sesion"&&!store.draft.fFecha)prefill(true);
+if("serviceWorker" in navigator&&location.protocol!=="file:"){window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{});});}
+setTimeout(()=>{getDL();},50);
+</script>
+</body>
+</html>
