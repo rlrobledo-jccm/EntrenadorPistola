@@ -12,22 +12,25 @@ App web instalable (PWA) para seguir un plan de entrenamiento de pistola de aire
 
 ## Contenido del repositorio
 
+Todos los ficheros van en la raíz, sin carpetas, para poder subirlos desde el móvil de una sola vez.
+
 ```
 index.html               la app (un solo fichero)
 manifest.webmanifest     manifiesto de la PWA (nombre, iconos, colores, accesos directos)
 sw.js                    service worker: funcionamiento sin conexión
-icons/                   iconos 192, 512, maskable, Apple y favicon
-screenshots/             capturas que PWABuilder usa para la ficha de la app
-docs/                    PDF de la programación y del físico y calentamiento
-.nojekyll                evita que GitHub Pages procese el sitio con Jekyll
+icon-*.png               iconos 192, 512 y maskable
+apple-touch-icon.png     icono para iPhone
+favicon-32.png           icono de pestaña
+captura-*.png            capturas que PWABuilder usa para la ficha de la app
+*.pdf                    programación y físico y calentamiento
 ```
 
 ## 1. Publicar en GitHub Pages
 
-GitHub Pages en una cuenta gratuita necesita un repositorio **público**: todo lo que subas, incluida la carpeta `docs/`, será visible. Tus sesiones no se suben: se quedan en el móvil y en tu Excel.
+GitHub Pages en una cuenta gratuita necesita un repositorio **público**: todo lo que subas, incluidos los PDF, será visible. Tus sesiones no se suben: se quedan en el móvil y en tu Excel.
 
 1. Crea un repositorio nuevo en GitHub. Si quieres el APK sin barra de dirección (paso 3), llámalo `TU_USUARIO.github.io`; si no, cualquier nombre sirve.
-2. Descomprime el zip y sube **el contenido** de la carpeta, no el zip: *Add file → Upload files* y arrastra todos los ficheros y carpetas. Comprueba que `.nojekyll` se ha subido; si el navegador no lo coge, créalo con *Add file → Create new file*, nombre `.nojekyll` y contenido vacío.
+2. Descomprime el zip y sube **los ficheros**, no el zip: *Add file → Upload files*, selecciónalos todos y pulsa *Commit changes*.
 3. *Settings → Pages → Build and deployment*: fuente *Deploy from a branch*, rama `main`, carpeta `/ (root)`. Guarda.
 4. Al cabo de un minuto la app estará en `https://TU_USUARIO.github.io/NOMBRE_REPO/` (o en `https://TU_USUARIO.github.io/` si usaste ese nombre).
 
@@ -55,7 +58,7 @@ Abre la dirección en Chrome para Android → menú ⋮ → **Instalar app** (o 
    - un `.aab`, solo para publicar en Google Play;
    - `signing.keystore` y `signing-key-info.txt`: **guárdalos**. Sin ellos no podrás generar actualizaciones que se instalen encima de la app;
    - `assetlinks.json`.
-4. **Quitar la barra de dirección del APK:** Android solo confía en la app si `assetlinks.json` está en `https://DOMINIO/.well-known/assetlinks.json`, en la raíz del dominio. En GitHub Pages eso solo es posible con un repositorio llamado `TU_USUARIO.github.io` (o con un dominio propio). Sube el fichero a la carpeta `.well-known/` de ese repositorio. Si la app está en un subdirectorio (`/NOMBRE_REPO/`), el APK funciona igual pero muestra una barra fina con la dirección arriba.
+4. **Quitar la barra de dirección del APK:** Android solo confía en la app si `assetlinks.json` está en `https://DOMINIO/.well-known/assetlinks.json`, en la raíz del dominio. En GitHub Pages eso solo es posible con un repositorio llamado `TU_USUARIO.github.io` (o con un dominio propio). Créalo en ese repositorio con *Add file → Create new file*, escribiendo como nombre `.well-known/assetlinks.json` y pegando su contenido. Si la app está en un subdirectorio (`/NOMBRE_REPO/`), el APK funciona igual pero muestra una barra fina con la dirección arriba.
 
 Cuando cambies la app, no hace falta regenerar el APK: el APK abre la versión publicada en GitHub Pages y se actualiza solo.
 
@@ -69,7 +72,7 @@ Una app web, instalada o como APK de PWABuilder, no puede escribir sola en una c
 
 ## Actualizar la app
 
-Edita los ficheros y súbelos. Si cambias algo más que `index.html`, sube el número de `CACHE` en `sw.js` (`tiro10m-v2` → `tiro10m-v3`) para que los móviles descarguen la versión nueva. La app se actualiza la siguiente vez que la abras con conexión.
+Edita los ficheros y súbelos. Si cambias algo más que `index.html`, sube el número de `CACHE` en `sw.js` (`tiro10m-v3` → `tiro10m-v4`) para que los móviles descarguen la versión nueva. La app se actualiza la siguiente vez que la abras con conexión.
 
 ## Notas
 

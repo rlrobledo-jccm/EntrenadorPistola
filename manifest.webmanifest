@@ -11,19 +11,74 @@
   "orientation": "portrait",
   "background_color": "#f3f5f7",
   "theme_color": "#14263b",
-  "categories": ["sports", "health", "fitness"],
+  "categories": [
+    "sports",
+    "health",
+    "fitness"
+  ],
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ],
   "screenshots": [
-    { "src": "screenshots/hoy.png", "sizes": "780x1688", "type": "image/png", "form_factor": "narrow", "label": "Sesión del día" },
-    { "src": "screenshots/timer.png", "sizes": "780x1688", "type": "image/png", "form_factor": "narrow", "label": "Timer con semáforo" },
-    { "src": "screenshots/fisico.png", "sizes": "780x1688", "type": "image/png", "form_factor": "narrow", "label": "Físico guiado" }
+    {
+      "src": "captura-hoy.png",
+      "sizes": "780x1688",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Sesión del día"
+    },
+    {
+      "src": "captura-timer.png",
+      "sizes": "780x1688",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Timer con semáforo"
+    },
+    {
+      "src": "captura-fisico.png",
+      "sizes": "780x1688",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Físico guiado"
+    }
   ],
   "shortcuts": [
-    { "name": "Timers", "url": "./#timers", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Registrar sesión", "url": "./#sesion", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+    {
+      "name": "Timers",
+      "url": "./#timers",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Registrar sesión",
+      "url": "./#sesion",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
   ]
 }
